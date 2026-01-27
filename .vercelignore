@@ -1,0 +1,5 @@
+# Vercel ignore file - don't ignore anything important
+node_modules
+.next
+.git
+*.log

@@ -1,0 +1,679 @@
+import { useState, useEffect } from 'react';
+import AdminLayout from '@/components/AdminLayout';
+import { getSlots, createSlot, updateSlot, createDaySlots, type SlotResponse, type UpdateSlotRequest } from '@/lib/api';
+
+export default function AdminManageSlots() {
+  const [slots, setSlots] = useState<SlotResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateDayModal, setShowCreateDayModal] = useState(false);
+  const [showSlotDetails, setShowSlotDetails] = useState<SlotResponse | null>(null);
+  const [slotBookings, setSlotBookings] = useState<any[]>([]);
+  const [editingSlot, setEditingSlot] = useState<SlotResponse | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [creatingDay, setCreatingDay] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    slot_datetime: '',
+    max_capacity: 30,
+    notes: '',
+  });
+
+  // Day slots form state
+  const [dayFormData, setDayFormData] = useState({
+    date: '',
+    start_time: '09:00',
+    end_time: '21:00',
+    interval_minutes: 45,
+    max_capacity: 30,
+    notes: '',
+  });
+
+  useEffect(() => {
+    loadSlots();
+  }, [filterStatus]);
+
+  const loadSlots = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const allSlots = await getSlots(filterStatus === 'all' ? undefined : filterStatus, filterStatus === 'all');
+      setSlots(allSlots);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to load slots');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      await createSlot(formData);
+      setShowCreateModal(false);
+      setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+      await loadSlots();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to create slot');
+    }
+  };
+
+  const handleEdit = (slot: SlotResponse) => {
+    setEditingSlot(slot);
+    setFormData({
+      slot_datetime: slot.slot_datetime.slice(0, 16), // Format for datetime-local input
+      max_capacity: slot.max_capacity,
+      notes: slot.notes || '',
+    });
+    setShowCreateModal(true);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSlot) return;
+    
+    try {
+      setError(null);
+      const updateData: UpdateSlotRequest = {
+        slot_datetime: formData.slot_datetime ? new Date(formData.slot_datetime).toISOString() : undefined,
+        max_capacity: formData.max_capacity,
+        notes: formData.notes,
+      };
+      await updateSlot(editingSlot.id, updateData);
+      setShowCreateModal(false);
+      setEditingSlot(null);
+      setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+      await loadSlots();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to update slot');
+    }
+  };
+
+
+  const handleCreateDaySlots = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setCreatingDay(true);
+      const result = await createDaySlots(dayFormData);
+      setShowCreateDayModal(false);
+      setDayFormData({
+        date: '',
+        start_time: '09:00',
+        end_time: '21:00',
+        interval_minutes: 45,
+        max_capacity: 30,
+        notes: '',
+      });
+      
+      if (result.errors && result.errors.length > 0) {
+        setError(`Created ${result.created_count} slots, but ${result.errors.length} failed: ${result.errors.join(', ')}`);
+      }
+      
+      await loadSlots();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to create day slots');
+    } finally {
+      setCreatingDay(false);
+    }
+  };
+
+
+  const formatTime = (isoString: string) => {
+    // Extract time directly from ISO string to avoid timezone conversion
+    // Format: "2026-01-13T09:00:00+00:00" -> "09:00"
+    const match = isoString.match(/T(\d{2}):(\d{2})/);
+    if (match) {
+      const hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const hour12 = hours % 12 || 12;
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      return `${hour12}:${minutes} ${ampm}`;
+    }
+    // Fallback to Date conversion if format doesn't match
+    const date = new Date(isoString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const formatDate = (isoString: string) => {
+    // Extract date directly from ISO string to avoid timezone conversion
+    // Format: "2026-01-13T09:00:00+00:00" -> "Jan 13, 2026"
+    const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+    // Fallback to Date conversion if format doesn't match
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatDateKey = (isoString: string) => {
+    // Extract date directly from ISO string to avoid timezone conversion
+    // Format: "2026-01-13T09:00:00+00:00" -> "01/13/2026"
+    const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [, year, month, day] = match;
+      return `${year}-${month}-${day}`;
+    }
+    // Fallback to Date conversion if format doesn't match
+    const date = new Date(isoString);
+    return date.toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).split('/').reverse().join('-');
+  };
+
+  const handleSlotClick = async (slot: SlotResponse) => {
+    setShowSlotDetails(slot);
+    // TODO: Fetch bookings for this slot when we have the endpoint
+    setSlotBookings([]);
+  };
+
+  // Group slots by date
+  const groupedSlotsByDate = slots.reduce((acc, slot) => {
+    const dateKey = formatDateKey(slot.slot_datetime);
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(slot);
+    return acc;
+  }, {} as Record<string, SlotResponse[]>);
+
+  // Sort slots within each date by time
+  Object.keys(groupedSlotsByDate).forEach(dateKey => {
+    groupedSlotsByDate[dateKey].sort((a, b) => 
+      new Date(a.slot_datetime).getTime() - new Date(b.slot_datetime).getTime()
+    );
+  });
+
+  // Convert to array and sort dates, then split into rows of 4
+  const dateGroupsArray = Object.entries(groupedSlotsByDate)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([dateKey, slots]) => ({
+      dateKey,
+      dateDisplay: formatDate(slots[0].slot_datetime),
+      slots,
+    }));
+
+  // Split date groups into rows of 4 dates
+  const chunkArray = <T,>(array: T[], chunkSize: number): T[][] => {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  };
+
+  const dateRows = chunkArray(dateGroupsArray, 4);
+
+
+  return (
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Interview Slots</h1>
+            <p className="text-muted-foreground mt-1">Manage interview time slots and capacities</p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setDayFormData({
+                  date: new Date().toISOString().split('T')[0], // Today's date
+                  start_time: '09:00',
+                  end_time: '21:00',
+                  interval_minutes: 45,
+                  max_capacity: 30,
+                  notes: '',
+                });
+                setShowCreateDayModal(true);
+              }}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              📅 Create Day Slots
+            </button>
+            <button
+              onClick={() => {
+                setEditingSlot(null);
+                setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+                setShowCreateModal(true);
+              }}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              + Create Slot
+            </button>
+          </div>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
+            {error}
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="flex items-center gap-4">
+          <label className="text-sm font-medium text-foreground">Filter by status:</label>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+          >
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="full">Full</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+
+        {/* Slots by Date Layout */}
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading slots...</p>
+          </div>
+        ) : slots.length === 0 ? (
+          <div className="text-center py-12 bg-card border border-border rounded-lg">
+            <p className="text-muted-foreground">No slots found. Create your first slot to get started.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {dateRows.map((dateRow, rowIndex) => (
+              <div key={rowIndex} className="space-y-4">
+                {/* Date Cards Row (4 columns - one date per card) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {dateRow.map((dateGroup) => (
+                    <div
+                      key={dateGroup.dateKey}
+                      className="bg-card border border-border rounded-lg p-4"
+                    >
+                      {/* Date Card Header */}
+                      <div className="mb-3 pb-3 border-b border-border">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-semibold text-foreground">
+                            {dateGroup.dateDisplay}
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {dateGroup.slots.length} time slot{dateGroup.slots.length !== 1 ? 's' : ''}
+                        </div>
+                      </div>
+                      
+                      {/* Time Slot Pills */}
+                      <div className="flex flex-wrap gap-2">
+                        {dateGroup.slots.map((slot) => {
+                          const isFull = slot.current_bookings >= slot.max_capacity;
+                          
+                          return (
+                            <button
+                              key={slot.id}
+                              onClick={() => handleSlotClick(slot)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:scale-105 ${
+                                isFull
+                                  ? 'bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
+                                  : slot.status === 'active'
+                                  ? 'bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
+                                  : 'bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                              }`}
+                            >
+                              <span>{formatTime(slot.slot_datetime)}</span>
+                              <span className="text-[10px] opacity-75">
+                                ({slot.current_bookings}/{slot.max_capacity})
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {/* Fill empty cards if less than 4 dates in this row */}
+                  {dateRow.length < 4 && Array.from({ length: 4 - dateRow.length }).map((_, emptyIndex) => (
+                    <div key={`empty-${emptyIndex}`} className="hidden lg:block" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Create/Edit Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-2xl font-bold text-foreground mb-4">
+              {editingSlot ? 'Edit Slot' : 'Create New Slot'}
+            </h2>
+            
+            <form onSubmit={editingSlot ? handleUpdate : handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Date & Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={formData.slot_datetime}
+                  onChange={(e) => setFormData({ ...formData, slot_datetime: e.target.value })}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Max Capacity (Students) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={formData.max_capacity}
+                  onChange={(e) => setFormData({ ...formData, max_capacity: parseInt(e.target.value) || 30 })}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Number of students that can be scheduled in this slot (e.g., 20, 30)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                  placeholder="Add any notes about this slot..."
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  {editingSlot ? 'Update Slot' : 'Create Slot'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setEditingSlot(null);
+                    setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+                  }}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Create Day Slots Modal */}
+      {showCreateDayModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold text-foreground mb-4">Create Day Slots</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create multiple slots for a single day with a specified time range and interval.
+            </p>
+            
+            <form onSubmit={handleCreateDaySlots} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Date *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={dayFormData.date}
+                  onChange={(e) => setDayFormData({ ...dayFormData, date: e.target.value })}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    Start Time *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={dayFormData.start_time}
+                    onChange={(e) => setDayFormData({ ...dayFormData, start_time: e.target.value })}
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-2">
+                    End Time *
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={dayFormData.end_time}
+                    onChange={(e) => setDayFormData({ ...dayFormData, end_time: e.target.value })}
+                    className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Interval Between Slots (minutes) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={dayFormData.interval_minutes}
+                  onChange={(e) => setDayFormData({ ...dayFormData, interval_minutes: parseInt(e.target.value) || 45 })}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Time between each slot (e.g., 45 minutes)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Max Capacity per Slot *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  value={dayFormData.max_capacity}
+                  onChange={(e) => setDayFormData({ ...dayFormData, max_capacity: parseInt(e.target.value) || 30 })}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Number of students per slot (e.g., 20, 30)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={dayFormData.notes}
+                  onChange={(e) => setDayFormData({ ...dayFormData, notes: e.target.value })}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                  placeholder="Add any notes for all slots..."
+                />
+              </div>
+
+              <div className="flex gap-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={creatingDay}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creatingDay ? 'Creating...' : 'Create All Slots'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCreateDayModal(false);
+                    setDayFormData({
+                      date: '',
+                      start_time: '09:00',
+                      end_time: '21:00',
+                      interval_minutes: 45,
+                      max_capacity: 30,
+                      notes: '',
+                    });
+                  }}
+                  className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Slot Details Modal */}
+      {showSlotDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSlotDetails(null)}>
+          <div className="bg-card border border-border rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  Slot Details - {formatTime(showSlotDetails.slot_datetime)}
+                </h2>
+                <p className="text-sm text-muted-foreground">{formatDate(showSlotDetails.slot_datetime)}</p>
+              </div>
+              <button
+                onClick={() => setShowSlotDetails(null)}
+                className="text-muted-foreground hover:text-foreground text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Slot Information */}
+            <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-muted rounded-lg">
+              <div>
+                <p className="text-sm text-muted-foreground">Status</p>
+                <p className="font-semibold text-foreground capitalize">{showSlotDetails.status}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Capacity</p>
+                <p className="font-semibold text-foreground">{showSlotDetails.max_capacity} students</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Current Bookings</p>
+                <p className="font-semibold text-foreground">{showSlotDetails.current_bookings}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Available</p>
+                <p className="font-semibold text-foreground">
+                  {showSlotDetails.max_capacity - showSlotDetails.current_bookings} slots
+                </p>
+              </div>
+              {(showSlotDetails as any).created_by && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Created By</p>
+                  <p className="font-semibold text-foreground">
+                    Admin ID: {(showSlotDetails as any).created_by?.substring(0, 8)}...
+                  </p>
+                </div>
+              )}
+              {(showSlotDetails as any).created_at && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Created At</p>
+                  <p className="font-semibold text-foreground">
+                    {new Date((showSlotDetails as any).created_at).toLocaleString()}
+                  </p>
+                </div>
+              )}
+              {showSlotDetails.notes && (
+                <div className="col-span-2">
+                  <p className="text-sm text-muted-foreground">Notes</p>
+                  <p className="text-foreground">{showSlotDetails.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Bookings List */}
+            <div>
+              <h3 className="text-lg font-semibold text-foreground mb-3">
+                Bookings ({showSlotDetails.current_bookings})
+              </h3>
+              {slotBookings.length === 0 ? (
+                <div className="text-center py-8 bg-muted rounded-lg">
+                  <p className="text-muted-foreground">
+                    {showSlotDetails.current_bookings === 0 
+                      ? 'No bookings for this slot yet' 
+                      : 'Booking details will be shown here'}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {slotBookings.map((booking, index) => (
+                    <div key={index} className="p-3 bg-muted rounded-lg">
+                      <p className="font-medium text-foreground">{booking.name}</p>
+                      <p className="text-sm text-muted-foreground">{booking.email}</p>
+                      {booking.phone && (
+                        <p className="text-sm text-muted-foreground">{booking.phone}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-4 mt-6 pt-4 border-t border-border">
+              <button
+                onClick={() => {
+                  handleEdit(showSlotDetails);
+                  setShowSlotDetails(null);
+                }}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Edit Slot
+              </button>
+              <button
+                onClick={() => setShowSlotDetails(null)}
+                className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </AdminLayout>
+  );
+}
+

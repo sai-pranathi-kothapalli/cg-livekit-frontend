@@ -35,23 +35,25 @@ export default function AdminScheduleInterview() {
   const loadAvailableSlots = async () => {
     try {
       // Use admin endpoint - get ALL slots (same as Interview Slots page with 'all' filter)
-      // Then filter client-side for available ones (active, not full, in future)
+      // Filter client-side for active slots in the future (show all, even if full)
       const allSlots = await getSlots(undefined, true);
+      
+      console.log(`[AdminScheduleInterview] Loaded ${allSlots.length} total slots from API`);
 
       // Filter for slots that are:
-      // - Active status
-      // - Not full
-      // - In the future (compared as strings/ISO dates)
+      // - Active status (required)
+      // - In the future (required)
+      // - Show ALL slots including full ones (admin can see capacity and decide)
       const now = new Date();
       const available = allSlots.filter(slot => {
         const slotDate = new Date(slot.slot_datetime);
         const isActive = slot.status === 'active';
-        const isNotFull = slot.current_bookings < slot.max_capacity;
         const isFuture = slotDate >= now;
 
-        return isActive && isNotFull && isFuture;
+        return isActive && isFuture;
       });
 
+      console.log(`[AdminScheduleInterview] Filtered to ${available.length} active future slots (including full slots)`);
       setAvailableSlots(available);
     } catch (err) {
       console.error('Failed to load available slots:', err);
@@ -112,8 +114,19 @@ export default function AdminScheduleInterview() {
   // Get unique dates sorted
   const availableDates = Object.keys(slotsByDate).sort();
 
-  // Get slots for selected date
+  // Get slots for selected date - ALL slots for that date (including full ones)
   const slotsForSelectedDate = selectedDate ? (slotsByDate[selectedDate] || []) : [];
+  
+  // Debug logging
+  if (selectedDate && slotsForSelectedDate.length > 0) {
+    console.log(`[AdminScheduleInterview] Selected date: ${selectedDate}, Found ${slotsForSelectedDate.length} slots`);
+    console.log(`[AdminScheduleInterview] Slots for ${selectedDate}:`, slotsForSelectedDate.map(s => ({
+      time: s.slot_datetime,
+      booked: s.current_bookings,
+      capacity: s.max_capacity,
+      status: s.status
+    })));
+  }
 
   // Format time for display - extract directly from ISO string to avoid timezone conversion
   const formatSlotTime = (isoString: string): string => {

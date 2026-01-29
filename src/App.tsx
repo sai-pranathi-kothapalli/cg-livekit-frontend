@@ -20,6 +20,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import StudentProfile from './pages/StudentProfile';
 import StudentMyInterviews from './pages/StudentMyInterviews';
 import StudentApplicationForm from './pages/StudentApplicationForm';
+import InterviewEvaluationPage from './pages/InterviewEvaluationPage';
 import ChangePassword from './pages/ChangePassword';
 import ForgotPassword from './pages/ForgotPassword';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -190,6 +191,14 @@ function App() {
           element={
             <ProtectedRoute requireStudent>
               <StudentApplicationForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/evaluation/:token"
+          element={
+            <ProtectedRoute>
+              <InterviewEvaluationPage />
             </ProtectedRoute>
           }
         />

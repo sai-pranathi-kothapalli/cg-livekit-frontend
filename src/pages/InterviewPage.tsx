@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { App } from '@/components/app/app';
-import { getBooking } from '@/lib/api';
+import { getBooking, getInterviewAccessConfig } from '@/lib/api';
 import { getAppConfig } from '@/lib/utils';
 import type { AppConfig } from '@/app-config';
 import { APP_CONFIG_DEFAULTS } from '@/app-config';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function InterviewPage() {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
+  const { isAuthenticated, isStudent, isLoading: authLoading } = useAuth();
   const [appConfig, setAppConfig] = useState<AppConfig>(APP_CONFIG_DEFAULTS);
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [requireLoginForInterview, setRequireLoginForInterview] = useState<boolean | null>(null);
+
+  // Fetch public config: does interview link require login?
+  useEffect(() => {
+    if (!token) return;
+    getInterviewAccessConfig()
+      .then((c) => setRequireLoginForInterview(c.require_login_for_interview))
+      .catch(() => setRequireLoginForInterview(true)); // default to secure on error
+  }, [token]);
 
   useEffect(() => {
     if (!token) {
@@ -20,14 +32,32 @@ export default function InterviewPage() {
       return;
     }
 
+    // Wait for interview config to be loaded
+    if (requireLoginForInterview === null) {
+      return;
+    }
+
+    // When login is required, wait for auth and enforce it
+    if (requireLoginForInterview) {
+      if (authLoading) return;
+      if (!isAuthenticated || !isStudent) {
+        setError('authentication_required');
+        setLoading(false);
+        setTimeout(() => {
+          navigate('/login', { state: { redirect: `/interview/${token}` } });
+        }, 2000);
+        return;
+      }
+    }
+
     async function loadData() {
+      setLoading(true);
       try {
         // Load app config (client-side, no headers needed)
         const config = await getAppConfig(null);
         setAppConfig(config);
 
-        // Get booking from backend
-        // Token is already checked above, but TypeScript needs non-null assertion
+        // Get booking (backend allows without auth when REQUIRE_LOGIN_FOR_INTERVIEW=false)
         const bookingData = await getBooking(token!);
         
         if (!bookingData) {
@@ -36,36 +66,105 @@ export default function InterviewPage() {
           return;
         }
 
-        // Check if interview window is valid (can join from scheduled time to 1 hour after)
+        // Set booking state FIRST so we can display scheduled time even if there's an error
+        setBooking(bookingData);
+        
+        // Check if interview window is valid (can only join during the scheduled interview time)
         const scheduledAt = new Date(bookingData.scheduled_at);
         const now = new Date();
-        const diffMinutes = (now.getTime() - scheduledAt.getTime()) / 60000;
+        
+        // Get interview duration from slot or default to 30 minutes
+        let durationMinutes = 30;
+        if (bookingData.slot?.duration_minutes) {
+          durationMinutes = bookingData.slot.duration_minutes;
+        } else if (bookingData.slot?.slot_datetime) {
+          // Calculate duration from slot start and end times if available
+          const slotStart = new Date(bookingData.slot.slot_datetime);
+          const slotEnd = bookingData.slot.end_time ? new Date(bookingData.slot.end_time) : null;
+          if (slotEnd) {
+            durationMinutes = Math.round((slotEnd.getTime() - slotStart.getTime()) / 60000);
+          }
+        }
+        
+        const interviewEndTime = new Date(scheduledAt.getTime() + durationMinutes * 60000);
+        
+        // Check if current time is before scheduled time
+        if (now < scheduledAt) {
+          setError('interview_too_early');
+          setLoading(false);
+          return;
+        }
+        
+        // Check if current time is after interview end time
+        if (now > interviewEndTime) {
+          setError('interview_expired');
+          setLoading(false);
+          return;
+        }
 
-        // [DEVELOPMENT BYPASS] Allow joining even if expired
-        // Check if current time is more than 1 hour after scheduled time
-        // if (diffMinutes > 60) {
-        //   setError('interview_expired');
-        //   setLoading(false);
-        //   return;
-        // }
-
-        setBooking(bookingData);
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         console.error('[InterviewPage] Error:', err);
-        setError('Failed to load interview');
+        // Handle authentication errors
+        if (err.message?.includes('401') || err.message?.includes('Authentication required')) {
+          setError('authentication_required');
+          setTimeout(() => {
+            navigate('/login', { state: { redirect: `/interview/${token}` } });
+          }, 2000);
+        } else if (err.message?.includes('403') || err.message?.includes('permission')) {
+          setError('access_denied');
+        } else {
+          setError('Failed to load interview');
+        }
         setLoading(false);
       }
     }
 
     loadData();
-  }, [token]);
+  }, [token, requireLoginForInterview, isAuthenticated, isStudent, authLoading, navigate]);
 
-  if (loading) {
+  const isLoading =
+    loading ||
+    requireLoginForInterview === null ||
+    (requireLoginForInterview === true && authLoading);
+
+  if (isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
         <div className="text-center">
           <p className="text-muted-foreground">Loading interview...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error === 'authentication_required') {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md space-y-3 text-center">
+          <h1 className="text-2xl font-semibold">Authentication Required</h1>
+          <p className="text-sm text-muted-foreground">
+            You must be logged in as a student to access this interview.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Redirecting to login page...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error === 'access_denied') {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md space-y-3 text-center">
+          <h1 className="text-2xl font-semibold">Access Denied</h1>
+          <p className="text-sm text-muted-foreground">
+            You do not have permission to access this interview.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This interview belongs to a different student.
+          </p>
         </div>
       </main>
     );
@@ -104,7 +203,7 @@ export default function InterviewPage() {
             Scheduled for {formattedDate} (IST).
           </p>
           <p className="text-sm text-muted-foreground">
-            Please join at the scheduled time. You can access the interview from the scheduled time up to 1 hour after.
+            Please join at the scheduled time. The interview link is only accessible during the scheduled interview time window.
           </p>
         </div>
       </main>
@@ -112,12 +211,39 @@ export default function InterviewPage() {
   }
 
   if (error === 'interview_expired') {
+    const scheduledAt = booking ? new Date(booking.scheduled_at) : new Date();
+    const durationMinutes = booking?.slot?.duration_minutes || 30;
+    const interviewEndTime = new Date(scheduledAt.getTime() + durationMinutes * 60000);
+    
+    const formattedStart = scheduledAt.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    });
+    
+    const formattedEnd = interviewEndTime.toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: 'Asia/Kolkata'
+    });
+    
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
         <div className="max-w-md space-y-3 text-center">
           <h1 className="text-2xl font-semibold">Interview window has expired</h1>
           <p className="text-sm text-muted-foreground">
-            This link is no longer active. Please contact support to reschedule.
+            The interview was scheduled from {formattedStart} to {formattedEnd} (IST).
+          </p>
+          <p className="text-sm text-muted-foreground">
+            The interview link is only accessible during the scheduled time window. Please contact support to reschedule.
           </p>
         </div>
       </main>
@@ -136,5 +262,12 @@ export default function InterviewPage() {
   }
 
   // Render LiveKit app
-  return <App appConfig={appConfig} interviewToken={token || undefined} />;
+  return (
+    <App 
+      appConfig={appConfig} 
+      interviewToken={token || undefined}
+      interviewDuration={booking?.slot?.duration_minutes || booking?.duration_minutes || 30}
+      scheduledAt={booking?.scheduled_at}
+    />
+  );
 }

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAllCandidates, type BookingResponse } from '@/lib/api';
 import AdminLayout from '@/components/AdminLayout';
 
 export default function AdminCandidatesList() {
+  const navigate = useNavigate();
   const [candidates, setCandidates] = useState<BookingResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -105,14 +107,22 @@ export default function AdminCandidatesList() {
                         <td className="px-6 py-4 text-sm">{formatDate(candidate.scheduled_at)}</td>
                         <td className="px-6 py-4 text-sm">{formatDate(candidate.created_at)}</td>
                         <td className="px-6 py-4 text-sm">
-                          <a
-                            href={`/interview/${candidate.token}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            View Interview
-                          </a>
+                          <div className="flex items-center gap-3">
+                            <a
+                              href={`/interview/${candidate.token}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              Interview
+                            </a>
+                            <button
+                              onClick={() => navigate(`/evaluation/${candidate.token}`)}
+                              className="text-green-600 hover:underline"
+                            >
+                              Evaluation
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

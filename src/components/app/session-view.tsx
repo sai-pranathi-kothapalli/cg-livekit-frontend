@@ -60,6 +60,9 @@ export function Fade({ top = false, bottom = false, className }: FadeProps) {
 
 interface SessionViewProps {
   appConfig: AppConfig;
+  interviewToken?: string; // Token for redirect to evaluation page
+  interviewDuration?: number; // Interview duration in minutes
+  scheduledAt?: string; // Scheduled interview start time (ISO string)
 }
 
 // Extended message type with streaming info
@@ -77,10 +80,21 @@ interface StreamingMessage {
 
 export const SessionView = ({
   appConfig,
+  interviewToken,
+  interviewDuration,
+  scheduledAt,
   ...props
 }: React.ComponentProps<'section'> & SessionViewProps) => {
   const session = useSessionContext();
   const { messages } = useSessionMessages(session);
+  
+  // Timer state
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+  const [interviewStartTime, setInterviewStartTime] = useState<Date | null>(null);
+  const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
+  
+  // Confirmation modal state
+  const [showExitModal, setShowExitModal] = useState(false);
   
   // Manual transcript messages state (for messages not picked up by useSessionMessages)
   const [manualTranscriptMessages, setManualTranscriptMessages] = useState<ReceivedMessage[]>([]);
@@ -218,6 +232,187 @@ export const SessionView = ({
     const isAgentMessage = !msg.from?.isLocal;
     return isAgentMessage && !completedMessageIds.current.has(msg.id);
   });
+  
+  // Initialize interview start time when session connects
+  useEffect(() => {
+    if (session.isConnected && !interviewStartTime) {
+      // Use scheduled time if available, otherwise use current time
+      const startTime = scheduledAt ? new Date(scheduledAt) : new Date();
+      setInterviewStartTime(startTime);
+      
+      // If we have duration, calculate initial time remaining
+      if (interviewDuration) {
+        const now = new Date();
+        const elapsed = (now.getTime() - startTime.getTime()) / 60000; // minutes
+        const remaining = Math.max(0, interviewDuration - elapsed);
+        setTimeRemaining(remaining);
+      }
+    }
+  }, [session.isConnected, scheduledAt, interviewDuration, interviewStartTime]);
+  
+  // Enter fullscreen when interview starts
+  useEffect(() => {
+    if (session.isConnected && !isInterviewCompleted) {
+      // Request fullscreen when interview starts
+      const enterFullscreen = async () => {
+        try {
+          const element = document.documentElement; // Full page fullscreen
+          if (element.requestFullscreen) {
+            await element.requestFullscreen();
+            console.log('✅ Entered fullscreen mode');
+          } else if ((element as any).webkitRequestFullscreen) {
+            // Safari
+            await (element as any).webkitRequestFullscreen();
+            console.log('✅ Entered fullscreen mode (Safari)');
+          } else if ((element as any).mozRequestFullScreen) {
+            // Firefox
+            await (element as any).mozRequestFullScreen();
+            console.log('✅ Entered fullscreen mode (Firefox)');
+          } else if ((element as any).msRequestFullscreen) {
+            // IE/Edge
+            await (element as any).msRequestFullscreen();
+            console.log('✅ Entered fullscreen mode (IE/Edge)');
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to enter fullscreen:', error);
+          // Fullscreen might be blocked by browser policy, continue anyway
+        }
+      };
+      
+      // Small delay to ensure page is ready
+      const timeout = setTimeout(() => {
+        enterFullscreen();
+      }, 500);
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [session.isConnected, isInterviewCompleted]);
+  
+  // Exit fullscreen when interview ends or disconnects
+  useEffect(() => {
+    if (isInterviewCompleted || !session.isConnected) {
+      const exitFullscreen = async () => {
+        try {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+            console.log('✅ Exited fullscreen mode');
+          } else if ((document as any).webkitFullscreenElement) {
+            // Safari
+            await (document as any).webkitExitFullscreen();
+            console.log('✅ Exited fullscreen mode (Safari)');
+          } else if ((document as any).mozFullScreenElement) {
+            // Firefox
+            await (document as any).mozCancelFullScreen();
+            console.log('✅ Exited fullscreen mode (Firefox)');
+          } else if ((document as any).msFullscreenElement) {
+            // IE/Edge
+            await (document as any).msExitFullscreen();
+            console.log('✅ Exited fullscreen mode (IE/Edge)');
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to exit fullscreen:', error);
+        }
+      };
+      
+      // Only exit if we're actually in fullscreen and interview has ended
+      if (isInterviewCompleted || (!session.isConnected && interviewStartTime)) {
+        exitFullscreen();
+      }
+    }
+  }, [isInterviewCompleted, session.isConnected, interviewStartTime]);
+  
+  // Handle fullscreen change events (user pressing ESC, etc.)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      
+      // If user manually exits fullscreen during interview, we can optionally re-enter
+      // But for now, we'll respect their choice and not force it back
+      if (!isFullscreen && session.isConnected && !isInterviewCompleted) {
+        console.log('ℹ️ User exited fullscreen manually');
+      }
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, [session.isConnected, isInterviewCompleted]);
+  
+  // Update timer every second
+  useEffect(() => {
+    if (!interviewStartTime || !interviewDuration) return;
+    
+    const interval = setInterval(() => {
+      const now = new Date();
+      const elapsed = (now.getTime() - interviewStartTime.getTime()) / 60000; // minutes
+      const remaining = Math.max(0, interviewDuration - elapsed);
+      setTimeRemaining(remaining);
+      
+      // If time is up, trigger interview completion
+      if (remaining <= 0 && !isInterviewCompleted) {
+        setTimeRemaining(0);
+        console.log('⏰ Timer reached 00:00 - triggering interview completion');
+        
+        // Mark as completed
+        setIsInterviewCompleted(true);
+        
+        // Send completion signal via data channel to ensure agent knows
+        // Get room from session if available
+        const currentRoom = session?.room;
+        if (currentRoom && currentRoom.localParticipant) {
+          try {
+            const completionSignal = JSON.stringify({
+              type: 'time_limit_reached',
+              message: 'Interview time has been completed. Please wrap up and redirect to evaluation.',
+              token: interviewToken,
+            });
+            currentRoom.localParticipant.publishData(
+              new TextEncoder().encode(completionSignal),
+              { topic: 'lk-chat', reliable: true }
+            );
+            console.log('✅ Sent time limit reached signal to agent');
+          } catch (e) {
+            console.warn('⚠️ Failed to send time limit signal:', e);
+          }
+        }
+        
+        // Redirect to evaluation page after a delay
+        if (interviewToken) {
+          setTimeout(() => {
+            const evaluationUrl = `/evaluation/${interviewToken}`;
+            console.log('🔄 Redirecting to evaluation page:', evaluationUrl);
+            window.location.href = evaluationUrl;
+          }, 3000); // 3 second delay to allow agent to finish speaking
+        }
+      }
+    }, 1000); // Update every second
+    
+    return () => clearInterval(interval);
+  }, [interviewStartTime, interviewDuration, isInterviewCompleted, session, interviewToken]);
+  
+  // Format time remaining for display
+  const formatTimeRemaining = (minutes: number | null): string => {
+    if (minutes === null) return '--:--';
+    if (minutes <= 0) return '00:00';
+    
+    const totalSeconds = Math.floor(minutes * 60);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   // Expose room info via console command
   useEffect(() => {
@@ -315,6 +510,53 @@ export const SessionView = ({
             parsedData: data,
           });
           
+          // Check for interview warning (2 minutes before end)
+          if (data.type === 'interview_warning') {
+            console.log('⚠️ Interview warning received:', data.message);
+            // Could show a toast notification here
+            return;
+          }
+          
+          // Check for time remaining update
+          if (data.type === 'time_remaining') {
+            console.log('⏰ Time remaining update received:', data.time_remaining_minutes);
+            if (typeof data.time_remaining_minutes === 'number') {
+              setTimeRemaining(data.time_remaining_minutes);
+            }
+            return;
+          }
+          
+          // Check for interview completion signal
+          if (data.type === 'interview_completed') {
+            console.log('✅ Interview completed signal received:', data);
+            
+            // Mark interview as completed (this will trigger fullscreen exit)
+            setIsInterviewCompleted(true);
+            
+            // Use token from signal or from props
+            const token = data.token || interviewToken;
+            
+            if (!token) {
+              console.warn('⚠️ Interview completed but no token available for redirect');
+              return;
+            }
+            
+            // Show completion message
+            if (data.message) {
+              console.log('📢 Completion message:', data.message);
+              // You could show a toast/notification here if needed
+            }
+            
+            // Redirect to evaluation page after a short delay (allow time for final data save)
+            setTimeout(() => {
+              const evaluationUrl = `/evaluation/${token}`;
+              console.log('🔄 Redirecting to evaluation page:', evaluationUrl);
+              window.location.href = evaluationUrl;
+            }, 3000); // 3 second delay to allow final data to be saved and closing message to finish
+            
+            return; // Don't process as transcript message
+          }
+          
           // Check if this is our transcript message (has "message" field)
           // Accept both agent transcripts (from remote) and user transcripts (from local)
           const isAgentTranscript = data.type === 'agentTranscript' && participant && !participant.isLocal;
@@ -379,9 +621,15 @@ export const SessionView = ({
       };
       
       console.log('🔧 Registering event handlers...');
+      
+      // Register event handlers
       room.on('participantConnected', handleParticipantConnected);
       room.on('participantDisconnected', handleParticipantDisconnected);
       room.on('dataReceived', handleDataReceived);
+      
+      // Note: In LiveKit, dataReceived is a room-level event, not participant-level
+      // The room.on('dataReceived') should handle all data channel messages
+      
       console.log('✅ Data channel handler registered');
       
       return () => {
@@ -705,8 +953,8 @@ export const SessionView = ({
 
   return (
     <section className="bg-background relative z-10 h-screen w-full overflow-hidden flex flex-col" {...props}>
-      {/* Room Status Bar */}
-      <RoomStatusBar />
+      {/* Room Status Bar with Timer */}
+      <RoomStatusBar timeRemaining={timeRemaining} />
       
       {/* Main Content Area: Videos on left, Transcript on right (Google Meet style) */}
       <div className="flex-1 flex flex-row min-h-0 gap-4 pt-14 pb-20 px-4 md:px-6">
@@ -776,10 +1024,86 @@ export const SessionView = ({
           <AgentControlBar
             controls={controls}
             isConnected={session.isConnected}
-            onDisconnect={session.end}
+            onDisconnect={() => setShowExitModal(true)}
           />
         </div>
       </MotionBottom>
+      
+      {/* Exit Confirmation Modal */}
+      {showExitModal && (
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={(e) => {
+            // Close modal if clicking on backdrop
+            if (e.target === e.currentTarget) {
+              setShowExitModal(false);
+            }
+          }}
+        >
+          <div className="bg-background border border-input rounded-lg shadow-xl max-w-md w-full mx-4 p-6 space-y-4">
+            <h2 className="text-xl font-semibold">Exit Interview?</h2>
+            <p className="text-sm text-muted-foreground">
+              Are you sure you want to exit the interview? You will be redirected to the evaluation page to view your progress so far.
+            </p>
+            <div className="flex gap-3 justify-end pt-4">
+              <button
+                onClick={() => setShowExitModal(false)}
+                className="px-4 py-2 text-sm font-medium text-foreground bg-muted hover:bg-muted/80 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setShowExitModal(false);
+                  setIsInterviewCompleted(true);
+                  
+                  // Exit fullscreen first
+                  try {
+                    if (document.fullscreenElement) {
+                      await document.exitFullscreen();
+                    } else if ((document as any).webkitFullscreenElement) {
+                      await (document as any).webkitExitFullscreen();
+                    } else if ((document as any).mozFullScreenElement) {
+                      await (document as any).mozCancelFullScreen();
+                    } else if ((document as any).msFullscreenElement) {
+                      await (document as any).msExitFullscreen();
+                    }
+                  } catch (error) {
+                    console.warn('Failed to exit fullscreen:', error);
+                  }
+                  
+                  // Disconnect from session
+                  try {
+                    await session.end();
+                  } catch (error) {
+                    console.warn('Failed to disconnect:', error);
+                  }
+                  
+                  // Redirect to evaluation page
+                  const token = interviewToken;
+                  if (token) {
+                    // Small delay to ensure disconnect is processed and transcript is saved
+                    setTimeout(() => {
+                      const evaluationUrl = `/evaluation/${token}`;
+                      console.log('🔄 Redirecting to evaluation page:', evaluationUrl);
+                      window.location.href = evaluationUrl;
+                    }, 1500); // Increased delay to ensure backend processes the disconnect
+                  } else {
+                    console.warn('⚠️ No interview token available for redirect');
+                    // Fallback: redirect to home or my interviews
+                    setTimeout(() => {
+                      window.location.href = '/my-interviews';
+                    }, 1000);
+                  }
+                }}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+              >
+                Yes, Exit Interview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 };

@@ -18,6 +18,7 @@ export default function AdminManageSlots() {
   const [formData, setFormData] = useState({
     slot_datetime: '',
     max_capacity: 30,
+    duration_minutes: 45, // Default 45 minutes
     notes: '',
   });
 
@@ -54,7 +55,7 @@ export default function AdminManageSlots() {
       setError(null);
       await createSlot(formData);
       setShowCreateModal(false);
-      setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+      setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
       await loadSlots();
     } catch (err) {
       setError((err as Error).message || 'Failed to create slot');
@@ -63,9 +64,27 @@ export default function AdminManageSlots() {
 
   const handleEdit = (slot: SlotResponse) => {
     setEditingSlot(slot);
+    // Calculate duration from start_time and end_time if available, otherwise default to 45
+    let duration = 45;
+    if (slot.start_time && slot.end_time) {
+      try {
+        const start = new Date(slot.start_time);
+        const end = new Date(slot.end_time);
+        if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+          duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60)); // Convert to minutes
+          // Ensure duration is valid (at least 1 minute, max 120)
+          if (duration < 1 || duration > 120) {
+            duration = 45; // Default if calculated duration is invalid
+          }
+        }
+      } catch (e) {
+        console.warn('Could not calculate duration from slot times:', e);
+      }
+    }
     setFormData({
       slot_datetime: slot.slot_datetime.slice(0, 16), // Format for datetime-local input
       max_capacity: slot.max_capacity,
+      duration_minutes: duration,
       notes: slot.notes || '',
     });
     setShowCreateModal(true);
@@ -85,7 +104,7 @@ export default function AdminManageSlots() {
       await updateSlot(editingSlot.id, updateData);
       setShowCreateModal(false);
       setEditingSlot(null);
-      setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+      setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
       await loadSlots();
     } catch (err) {
       setError((err as Error).message || 'Failed to update slot');
@@ -122,23 +141,32 @@ export default function AdminManageSlots() {
   };
 
 
-  const formatTime = (isoString: string) => {
-    // Extract time directly from ISO string to avoid timezone conversion
-    // Format: "2026-01-13T09:00:00+00:00" -> "09:00"
-    const match = isoString.match(/T(\d{2}):(\d{2})/);
-    if (match) {
-      const hours = parseInt(match[1], 10);
-      const minutes = match[2];
-      const hour12 = hours % 12 || 12;
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      return `${hour12}:${minutes} ${ampm}`;
+  // Format time in IST timezone (extract from ISO string to avoid browser timezone conversion)
+  const formatTime = (isoString: string): string => {
+    try {
+      // Parse the ISO string and extract time directly to avoid timezone conversion
+      // Backend returns times in IST (e.g., "2026-01-13T09:00:00+05:30")
+      const match = isoString.match(/T(\d{2}):(\d{2}):?(\d{2})?/);
+      if (match) {
+        const [, hourStr, minuteStr] = match;
+        const hours = parseInt(hourStr, 10);
+        const minutes = parseInt(minuteStr, 10);
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        const displayMinutes = String(minutes).padStart(2, '0');
+        return `${displayHours}:${displayMinutes} ${ampm} IST`;
+      }
+      // Fallback: use Date but specify IST timezone
+      const date = new Date(isoString);
+      return date.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }) + ' IST';
+    } catch (e) {
+      return isoString;
     }
-    // Fallback to Date conversion if format doesn't match
-    const date = new Date(isoString);
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
   };
 
   const formatDate = (isoString: string) => {
@@ -253,7 +281,7 @@ export default function AdminManageSlots() {
             <button
               onClick={() => {
                 setEditingSlot(null);
-                setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+                setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
                 setShowCreateModal(true);
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -377,6 +405,24 @@ export default function AdminManageSlots() {
                   onChange={(e) => setFormData({ ...formData, slot_datetime: e.target.value })}
                   className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  Interview Duration (Minutes) *
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="1"
+                  max="120"
+                  value={formData.duration_minutes}
+                  onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 45 })}
+                  className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Duration of each interview in this slot (e.g., 5, 10, 30, 45 minutes). Default: 45 minutes.
+                </p>
               </div>
 
               <div>

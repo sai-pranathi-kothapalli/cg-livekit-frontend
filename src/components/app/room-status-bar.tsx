@@ -1,11 +1,18 @@
 'use client';
 
-import { useSessionContext } from '@livekit/components-react';
+import { useSessionContext, useAgent, useRemoteParticipants } from '@livekit/components-react';
 import { useEffect, useState } from 'react';
 
-export function RoomStatusBar() {
+interface RoomStatusBarProps {
+  timeRemaining?: number | null; // Time remaining in minutes
+}
+
+export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {}) {
   const session = useSessionContext();
   const room = session.room;
+  const agent = useAgent();
+  const remoteParticipants = useRemoteParticipants();
+  
   const [info, setInfo] = useState<{
     roomSid: string | null;
     localSid: string | null;
@@ -20,6 +27,9 @@ export function RoomStatusBar() {
     return true;
   });
   const [isLiveKitConnected, setIsLiveKitConnected] = useState(false);
+  
+  // Agent health status
+  const [agentHealthStatus, setAgentHealthStatus] = useState<'healthy' | 'connecting' | 'destroyed' | 'unknown'>('unknown');
 
   // Monitor browser online/offline events
   useEffect(() => {
@@ -116,12 +126,81 @@ export function RoomStatusBar() {
     };
   }, [room]);
 
+  // Monitor agent health status
+  useEffect(() => {
+    if (!room || !isLiveKitConnected) {
+      setAgentHealthStatus('unknown');
+      return;
+    }
+    
+    // Check for agent participant
+    const agentParticipant = remoteParticipants.find(p => p.isAgent);
+    
+    // Check agent state if available
+    if (agent) {
+      if (agent.state === 'failed' || agent.state === 'destroyed') {
+        setAgentHealthStatus('destroyed');
+      } else if (agent.state === 'connecting' || agent.state === 'initializing') {
+        setAgentHealthStatus('connecting');
+      } else if (agent.state === 'active' && agentParticipant) {
+        setAgentHealthStatus('healthy');
+      } else if (agentParticipant) {
+        // Agent participant exists but state is unknown
+        setAgentHealthStatus('healthy');
+      } else {
+        setAgentHealthStatus('connecting');
+      }
+    } else if (agentParticipant) {
+      // Agent participant exists but agent hook not available
+      setAgentHealthStatus('healthy');
+    } else {
+      // No agent participant found
+      setAgentHealthStatus('connecting');
+    }
+  }, [room, isLiveKitConnected, agent, remoteParticipants]);
+  
   // Determine overall connection status
   const connectionStatus = !isOnline 
     ? 'offline' 
     : !isLiveKitConnected 
     ? 'connecting' 
     : 'connected';
+  
+  // Get agent health status display
+  const getAgentHealthDisplay = () => {
+    switch (agentHealthStatus) {
+      case 'healthy':
+        return {
+          label: 'Agent Healthy',
+          dotColor: 'bg-green-500',
+          textColor: 'text-green-600 dark:text-green-400',
+          title: 'Agent is connected and responding'
+        };
+      case 'connecting':
+        return {
+          label: 'Agent Connecting',
+          dotColor: 'bg-yellow-500',
+          textColor: 'text-yellow-600 dark:text-yellow-400',
+          title: 'Agent is connecting or initializing'
+        };
+      case 'destroyed':
+        return {
+          label: 'Agent Destroyed',
+          dotColor: 'bg-red-500',
+          textColor: 'text-red-600 dark:text-red-400',
+          title: 'Agent connection has been terminated'
+        };
+      default:
+        return {
+          label: 'Agent Unknown',
+          dotColor: 'bg-gray-500',
+          textColor: 'text-gray-600 dark:text-gray-400',
+          title: 'Agent status unknown'
+        };
+    }
+  };
+  
+  const agentHealth = getAgentHealthDisplay();
 
   // Always show connectivity indicator, even if roomSid is not available yet
   return (
@@ -162,6 +241,52 @@ export function RoomStatusBar() {
               </span>
             </div>
           </div>
+          
+          {/* Timer Display */}
+          {timeRemaining !== null && (
+            <div className="flex items-center gap-2 border-l border-input/50 pl-4">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Time Remaining</span>
+                <span className={`text-sm font-mono font-semibold ${
+                  timeRemaining <= 2 ? 'text-red-500' : 
+                  timeRemaining <= 5 ? 'text-orange-500' : 
+                  'text-foreground'
+                }`}>
+                  {(() => {
+                    if (timeRemaining <= 0) return '00:00';
+                    const totalSeconds = Math.floor(timeRemaining * 60);
+                    const mins = Math.floor(totalSeconds / 60);
+                    const secs = totalSeconds % 60;
+                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+                  })()}
+                </span>
+              </div>
+              {timeRemaining <= 2 && (
+                <div className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+              )}
+            </div>
+          )}
+          
+          {/* Agent Health Status */}
+          {isLiveKitConnected && (
+            <div className="flex items-center gap-2 border-l border-input/50 pl-4">
+              <div className="flex items-center gap-1.5">
+                <div 
+                  className={`w-2.5 h-2.5 rounded-full transition-colors shadow-sm ${
+                    agentHealthStatus === 'healthy' 
+                      ? agentHealth.dotColor + ' animate-pulse'
+                      : agentHealthStatus === 'connecting'
+                      ? agentHealth.dotColor + ' animate-pulse'
+                      : agentHealth.dotColor
+                  }`}
+                  title={agentHealth.title}
+                />
+                <span className={`text-xs font-semibold ${agentHealth.textColor}`}>
+                  {agentHealth.label}
+                </span>
+              </div>
+            </div>
+          )}
           
           {/* Only show room info if available */}
           {info.roomSid && (

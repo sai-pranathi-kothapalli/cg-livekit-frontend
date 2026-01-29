@@ -25,9 +25,11 @@ function AppSetup() {
 interface AppProps {
   appConfig: AppConfig;
   interviewToken?: string;
+  interviewDuration?: number;
+  scheduledAt?: string;
 }
 
-export function App({ appConfig, interviewToken }: AppProps) {
+export function App({ appConfig, interviewToken, interviewDuration, scheduledAt }: AppProps) {
   const tokenSource = useMemo(() => {
     if (import.meta.env.VITE_CONN_DETAILS_ENDPOINT) {
       return getSandboxTokenSource(appConfig);
@@ -49,9 +51,16 @@ export function App({ appConfig, interviewToken }: AppProps) {
           agentName: appConfig.agentName,
           requestBody,
         });
+        // Include auth token in headers if available
+        const authToken = localStorage.getItem('authToken');
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
         const res = await fetch(`${API_BASE_URL}/api/connection-details`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify(requestBody),
         });
         if (!res.ok) {
@@ -120,7 +129,12 @@ export function App({ appConfig, interviewToken }: AppProps) {
     <SessionProvider session={session}>
       <AppSetup />
       <main className="grid h-svh grid-cols-1 place-content-center">
-        <ViewController appConfig={appConfig} />
+        <ViewController 
+          appConfig={appConfig} 
+          interviewToken={interviewToken}
+          interviewDuration={interviewDuration}
+          scheduledAt={scheduledAt}
+        />
       </main>
       <StartAudio label="Start Audio" />
       <RoomAudioRenderer />

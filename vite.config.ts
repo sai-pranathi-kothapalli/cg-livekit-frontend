@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0', // Allow network access
       port: Number(env.VITE_PORT) || 3000,
+      allowedHosts: true, // Allow cloudflared tunnel hosts (*.trycloudflare.com) and others
       proxy: {
         // Proxy API calls to Python backend (when running in dev)
         '/api': {

@@ -6,9 +6,7 @@
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
 
-if (!API_BASE_URL && import.meta.env.DEV) {
-  console.warn('API_BASE_URL is not defined. Using relative paths.');
-}
+// Note: Empty string means relative paths, which works fine for same-origin requests
 
 /**
  * Get auth token from localStorage
@@ -102,6 +100,15 @@ export interface BookingResponse {
   created_at: string;
   application_text?: string | null;
   application_url?: string | null;
+  slot_id?: string | null;
+  slot?: {
+    id: string;
+    slot_datetime: string;
+    duration_minutes?: number;
+    max_capacity?: number;
+    current_bookings?: number;
+    status?: string;
+  } | null;
 }
 
 /**
@@ -156,17 +163,237 @@ export async function scheduleInterview(data: ScheduleInterviewRequest): Promise
 }
 
 /**
+ * Public config: whether interview link requires login (no auth required).
+ * Used by InterviewPage to decide whether to show login gate or allow direct access.
+ */
+export interface InterviewAccessConfig {
+  require_login_for_interview: boolean;
+}
+
+export async function getInterviewAccessConfig(): Promise<InterviewAccessConfig> {
+  const url = `${API_BASE_URL}/api/public/interview-config`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load interview config: ${res.statusText}`);
+  return res.json();
+}
+
+/**
  * Get booking by token
+ * Requires authentication when backend REQUIRE_LOGIN_FOR_INTERVIEW=true; optional when false.
  */
 export async function getBooking(token: string): Promise<BookingResponse | null> {
   try {
-    return await apiRequest<BookingResponse>(`${API_BASE_URL}/api/booking/${token}`);
+    return await apiRequest<BookingResponse>(`${API_BASE_URL}/api/booking/${token}`, {
+      headers: getAuthHeaders(),
+    });
   } catch (error: any) {
     if (error.message.includes('404') || error.message.includes('not found')) {
       return null;
     }
     throw error;
   }
+}
+
+// ==================== Evaluation API Functions ====================
+
+export interface RoundEvaluationResponse {
+  round_number: number;
+  round_name: string;
+  questions_asked: number;
+  average_rating?: number;
+  time_spent_minutes?: number;
+  time_target_minutes?: number;
+  topics_covered: string[];
+  performance_summary?: string;
+  response_ratings: number[];
+}
+
+export interface EvaluationResponse {
+  booking: BookingResponse;
+  candidate: {
+    name: string;
+    email: string;
+    application_form?: {
+      text?: string;
+      url?: string;
+    };
+  };
+  interview_metrics?: {
+    duration_minutes?: number;
+    rounds_completed?: number;
+    total_questions?: number;
+    average_response_time?: number;
+  };
+  rounds: RoundEvaluationResponse[];
+  overall_score?: number;
+  strengths: string[];
+  areas_for_improvement: string[];
+  transcript: Array<{
+    role: string;
+    content: string;
+    timestamp?: string;
+    index?: number;
+  }>;
+}
+
+/**
+ * Orchestrator API - Get full session data
+ */
+export interface OrchestratorSessionFull {
+  _id: string;
+  session_id: string;
+  action_type: string;
+  created_at: string;
+  updated_at: string;
+  messages: Array<{
+    role: string;
+    content: string;
+    timestamp: string;
+    metadata?: any;
+  }>;
+  permanent_context?: {
+    candidate_name?: string;
+    candidate_role?: string;
+    key_facts?: string[];
+  };
+  /** From POST /session/{id}/evaluate (orchestrator) */
+  evaluation_report?: {
+    summary?: string;
+    strengths?: string[];
+    areas_to_improve?: string[];
+    overall_score?: number;
+  };
+  metadata?: any;
+}
+
+/**
+ * Get full session data from orchestrator via backend proxy.
+ * Backend calls orchestrator with ORCH_API_KEY so the key is never exposed to the frontend.
+ */
+export async function getOrchestratorSessionFull(sessionId: string): Promise<OrchestratorSessionFull> {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+  const url = `${API_BASE_URL}/api/orchestrator/session/${sessionId}/full`;
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  const token = getAuthToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    throw new Error(`Orchestrator API error: ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/**
+ * Get evaluation data for an interview
+ * Tries orchestrator first (using booking token or room name as session_id), then falls back to backend API
+ */
+export async function getEvaluation(token: string): Promise<EvaluationResponse> {
+  // Try orchestrator first - use booking token as session_id
+  // The orchestrator uses the same session_id that was used during the interview
+  // During interview: session_id = booking_token or room.name
+  let orchestratorData: OrchestratorSessionFull | null = null;
+  let sessionIdUsed: string | null = null;
+  
+  // Try booking token first (most common case)
+  try {
+    orchestratorData = await getOrchestratorSessionFull(token);
+    sessionIdUsed = token;
+  } catch (error: any) {
+    // If 404, try to get room name from connection details
+    if (error?.message?.includes('404') || error?.message?.includes('not found')) {
+      try {
+        // Try to get room name from connection details
+        const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+        const authToken = getAuthToken();
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (authToken) {
+          headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        
+        const connRes = await fetch(`${API_BASE_URL}/api/connection-details`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ token }),
+        });
+        
+        if (connRes.ok) {
+          const connData = await connRes.json();
+          const roomName = connData.roomName;
+          if (roomName) {
+            try {
+              orchestratorData = await getOrchestratorSessionFull(roomName);
+              sessionIdUsed = roomName;
+            } catch (roomError) {
+              // Room name also failed, continue to fallback
+            }
+          }
+        }
+      } catch (connError) {
+        // Connection details failed, continue to fallback
+      }
+    }
+  }
+  
+  // If we got orchestrator data, use it
+  if (orchestratorData) {
+    
+    // Get booking data for additional info
+    let booking: BookingResponse | null = null;
+    try {
+      booking = await getBooking(token);
+    } catch (bookingError) {
+      console.warn('Could not fetch booking data:', bookingError);
+    }
+    
+    // Map orchestrator data to EvaluationResponse format
+    const durationMs = new Date(orchestratorData.updated_at).getTime() - new Date(orchestratorData.created_at).getTime();
+    const durationMinutes = Math.floor(durationMs / 60000);
+    
+    // Count questions (assistant messages)
+    const assistantMessages = orchestratorData.messages.filter(m => m.role === 'assistant');
+    
+    return {
+      booking: booking || {
+        token: token,
+        name: orchestratorData.permanent_context?.candidate_name || 'Unknown',
+        email: '',
+        phone: '',
+        scheduled_at: orchestratorData.created_at,
+        created_at: orchestratorData.created_at,
+      },
+      candidate: {
+        name: orchestratorData.permanent_context?.candidate_name || booking?.name || 'Unknown',
+        email: booking?.email || '',
+        application_form: booking?.application_text ? {
+          text: booking.application_text,
+          url: booking.application_url || undefined,
+        } : undefined,
+      },
+      interview_metrics: {
+        duration_minutes: durationMinutes,
+        rounds_completed: 0, // Not available from orchestrator
+        total_questions: assistantMessages.length,
+        average_response_time: 0, // Not available from orchestrator
+      },
+      rounds: [], // Not available from orchestrator
+      overall_score: orchestratorData.evaluation_report?.overall_score,
+      strengths: orchestratorData.evaluation_report?.strengths ?? orchestratorData.permanent_context?.key_facts ?? [],
+      areas_for_improvement: orchestratorData.evaluation_report?.areas_to_improve ?? [],
+      transcript: orchestratorData.messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      })),
+    };
+  }
+  
+  // If orchestrator didn't return data, fall back to backend API
+  console.log('Orchestrator data not available, using backend API');
+  return apiRequest<EvaluationResponse>(`${API_BASE_URL}/api/evaluation/${token}`, {
+    headers: getAuthHeaders(),
+  });
 }
 
 // ==================== Unified Login API Functions ====================
@@ -406,20 +633,27 @@ export interface SelectSlotRequest {
 }
 
 export interface MyInterviewResponse {
-  enrolled: AssignmentResponse[];
-  scheduled?: {
-    assignment: {
-      id: string;
-      slot_id: string;
-      selected_at?: string;
-    };
-    slot: SlotResponse;
+  upcoming: Array<{
     booking: {
       token: string;
       scheduled_at: string;
-      interview_url: string;
+      interview_url?: string;
+      name?: string;
+      email?: string;
     };
-  };
+    slot: SlotResponse | null;
+  }>;
+  missed: Array<{
+    booking: {
+      token: string;
+      scheduled_at: string;
+      interview_url?: string;
+      name?: string;
+      email?: string;
+      status?: string;
+    };
+    slot: SlotResponse | null;
+  }>;
   completed: Array<{
     booking: any;
     slot: SlotResponse | null;
@@ -481,6 +715,8 @@ export async function deleteUser(userId: string): Promise<void> {
 export interface SlotResponse {
   id: string;
   slot_datetime: string;
+  start_time?: string; // Optional: start time of the slot
+  end_time?: string; // Optional: end time of the slot
   max_capacity: number;
   current_bookings: number;
   status: string;
@@ -493,6 +729,7 @@ export interface SlotResponse {
 export interface CreateSlotRequest {
   slot_datetime: string;
   max_capacity: number;
+  duration_minutes?: number; // Interview duration in minutes (default 45)
   notes?: string;
 }
 

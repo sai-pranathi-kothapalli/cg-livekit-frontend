@@ -175,7 +175,19 @@ export const SessionView = ({
     // Sort result by timestamp to maintain order
     result.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     
-    return result;
+    // Deduplicate local (user) messages by exact content so same transcript doesn't appear twice
+    const seenLocalContent = new Set<string>();
+    const deduped = result.filter(m => {
+      if (m.from?.isLocal) {
+        const content = (m.message || '').trim();
+        if (!content) return true;
+        if (seenLocalContent.has(content)) return false;
+        seenLocalContent.add(content);
+      }
+      return true;
+    });
+    
+    return deduped;
   }, [messages, manualTranscriptMessages]);
   
   // DEBUG: Log all messages to verify reception
@@ -558,12 +570,15 @@ export const SessionView = ({
           }
           
           // Check if this is our transcript message (has "message" field)
-          // Accept both agent transcripts (from remote) and user transcripts (from local)
+          // Agent transcripts: sent by remote (agent). User transcripts: sent by agent on behalf of user, show as local
           const isAgentTranscript = data.type === 'agentTranscript' && participant && !participant.isLocal;
-          const isUserTranscript = data.type === 'userTranscript' && participant && participant.isLocal;
+          const isUserTranscript = data.type === 'userTranscript'; // Accept from any participant (agent sends it)
           
           if (data.message && typeof data.message === 'string' && (isAgentTranscript || isUserTranscript)) {
             console.log(`✅ ${data.type} MESSAGE DETECTED:`, data.message.substring(0, 50));
+            
+            // For userTranscript, display as local (candidate) message; for agentTranscript use sending participant
+            const displayFrom = isUserTranscript && room.localParticipant ? room.localParticipant : participant;
             
             // Always add transcript messages to ensure they display
             // We'll deduplicate in the allMessages merge logic
@@ -573,7 +588,7 @@ export const SessionView = ({
               // Check for duplicates within manual messages only (by content similarity)
               // Allow updates if new message is longer (partial -> full)
               const existingIndex = prev.findIndex(m => {
-                const sameParticipant = m.from?.identity === participant.identity || m.from?.sid === participant.sid;
+                const sameParticipant = m.from?.identity === displayFrom?.identity || m.from?.sid === displayFrom?.sid;
                 const recentTimestamp = Math.abs((m.timestamp || 0) - now) < 5000; // Within 5 seconds
                 const sameOrLongerMessage = data.message === m.message || 
                                            data.message.startsWith(m.message) || 
@@ -581,13 +596,13 @@ export const SessionView = ({
                 return sameParticipant && recentTimestamp && sameOrLongerMessage;
               });
               
-              // Create a ReceivedMessage object - use participant directly for 'from' field
+              // Create a ReceivedMessage object - use displayFrom so userTranscript shows as local user
               const transcriptMessage: ReceivedMessage = {
                 id: `transcript-${now}-${Math.random().toString(36).substring(2, 9)}`,
                 timestamp: now,
                 message: data.message,
-                from: participant, // Use the participant object directly
-                type: data.type || 'chatMessage', // Use the type from data (agentTranscript or userTranscript)
+                from: displayFrom,
+                type: data.type || 'chatMessage', // agentTranscript or userTranscript
               };
               
               if (existingIndex >= 0) {
@@ -838,22 +853,17 @@ export const SessionView = ({
                 const charsToAdd = Math.min(3, totalLength - currentLength);
                 newLength = currentLength + charsToAdd;
               } else {
-                // Word streaming: add 1-2 words at a time
-                const words = fullText.split(/(\s+)/).filter(w => w.length > 0);
+                // Word streaming: add 1-2 words at a time (keep spaces in split so length matches fullText)
+                const words = fullText.split(/(\s+)/);
                 const displayedText = fullText.slice(0, currentLength);
-                const displayedWords = displayedText.split(/(\s+)/).filter(w => w.length > 0);
+                const displayedTokens = displayedText.split(/(\s+)/);
                 
-                // Find next word boundary
-                let nextWordIndex = displayedWords.length;
-                const wordsToAdd = Math.min(2, words.length - nextWordIndex);
+                let nextTokenIndex = displayedTokens.length;
+                const tokensToAdd = Math.min(2, Math.max(0, words.length - nextTokenIndex));
+                nextTokenIndex += tokensToAdd;
                 
-                for (let i = 0; i < wordsToAdd && nextWordIndex < words.length; i++) {
-                  nextWordIndex++;
-                }
-                
-                // Calculate new length by joining words up to nextWordIndex
-                const newDisplayedText = words.slice(0, nextWordIndex).join('');
-                newLength = newDisplayedText.length;
+                const newDisplayedText = words.slice(0, nextTokenIndex).join('');
+                newLength = Math.min(newDisplayedText.length, totalLength);
               }
               
               // Clamp to total length
@@ -897,30 +907,36 @@ export const SessionView = ({
         
         streamingIntervals.current.set(msg.id, streamInterval);
       } else {
-        // User messages - COMMENTED OUT: User speech transcription is not accurate
-        // We're hiding user speech transcription for now until accuracy improves
-        // setStreamingMessages(prev => {
-        //   if (prev.some(m => m.id === msg.id)) return prev;
-        //   return [...prev, {
-        //     id: msg.id,
-        //     timestamp: msg.timestamp,
-        //     from: msg.from,
-        //     message: msg.message,
-        //     isStreaming: false,
-        //     displayedLength: msg.message.length,
-        //     messageOrigin: 'local',
-        //     type: msg.type,
-        //     editTimestamp: (msg as any).editTimestamp,
-        //   }];
-        // });
+        // User messages (userTranscript from agent or local) - show in transcript
+        setStreamingMessages(prev => {
+          if (prev.some(m => m.id === msg.id)) return prev;
+          return [...prev, {
+            id: msg.id,
+            timestamp: msg.timestamp,
+            from: msg.from,
+            message: msg.message,
+            isStreaming: false,
+            displayedLength: msg.message?.length ?? 0,
+            messageOrigin: 'local',
+            type: msg.type,
+            editTimestamp: (msg as any).editTimestamp,
+          }];
+        });
       }
     });
     
-    // Cleanup intervals on unmount
+    // Do NOT clear all intervals here - this effect runs whenever allMessages changes.
+    // Clearing here would stop in-progress streaming when a new message arrives (AI transcript would cut off).
+    // Intervals are cleared per-message when streaming completes, and all are cleared on unmount below.
+  }, [allMessages]);
+
+  // Clear all streaming intervals only on unmount
+  useEffect(() => {
     return () => {
       streamingIntervals.current.forEach(interval => clearInterval(interval));
+      streamingIntervals.current.clear();
     };
-  }, [allMessages]);
+  }, []);
 
   useEffect(() => {
     console.log('📺 Streaming messages state:', {

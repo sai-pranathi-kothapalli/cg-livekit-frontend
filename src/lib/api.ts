@@ -234,6 +234,12 @@ export interface EvaluationResponse {
     timestamp?: string;
     index?: number;
   }>;
+  /** Criteria scores from Gemini analysis (0–10) */
+  communication_quality?: number;
+  technical_knowledge?: number;
+  problem_solving?: number;
+  /** Overall feedback paragraph from AI */
+  overall_feedback?: string;
 }
 
 /**

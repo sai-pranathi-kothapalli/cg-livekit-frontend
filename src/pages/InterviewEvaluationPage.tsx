@@ -1,7 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import StudentLayout from '@/components/StudentLayout';
-import AdminLayout from '@/components/AdminLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEvaluation, type EvaluationResponse, type RoundEvaluationResponse } from '@/lib/api';
 
@@ -51,6 +49,7 @@ export default function InterviewEvaluationPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const backTo = isAdmin ? '/admin/dashboard' : '/student/my-interviews';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,46 +107,47 @@ export default function InterviewEvaluationPage() {
     return 'bg-red-100 dark:bg-red-900';
   };
 
-  const Layout = isAdmin ? AdminLayout : StudentLayout;
+  const standaloneWrapper = (content: ReactNode) => (
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">{content}</div>
+    </div>
+  );
 
   if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center p-8">
-          <div className="text-muted-foreground">Loading evaluation data...</div>
-        </div>
-      </Layout>
+    return standaloneWrapper(
+      <div className="flex items-center justify-center p-8">
+        <div className="text-muted-foreground">Loading evaluation data...</div>
+      </div>
     );
   }
 
   if (error || !evaluationData) {
-    return (
-      <Layout>
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-          {error || 'Evaluation data not available'}
-        </div>
-      </Layout>
+    return standaloneWrapper(
+      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+        {error || 'Evaluation data not available'}
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Interview Evaluation</h1>
-            <p className="text-muted-foreground mt-1">
-              Comprehensive assessment of interview performance
-            </p>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Interview Evaluation</h1>
+              <p className="text-muted-foreground mt-1">
+                Comprehensive assessment of interview performance
+              </p>
+            </div>
+            <button
+              onClick={() => navigate(backTo)}
+              className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+            >
+              ← Back
+            </button>
           </div>
-          <button
-            onClick={() => navigate(isAdmin ? '/admin/dashboard' : '/student/my-interviews')}
-            className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-          >
-            ← Back
-          </button>
-        </div>
 
         {/* Interview Overview Card */}
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
@@ -179,7 +179,7 @@ export default function InterviewEvaluationPage() {
         </div>
 
         {/* Overall Score Card */}
-        {evaluationData.overall_score && (
+        {evaluationData.overall_score != null && (
           <div className={`rounded-lg border border-border p-6 shadow-sm ${getScoreBgColor(evaluationData.overall_score)}`}>
             <div className="flex items-center justify-between">
               <div>
@@ -191,10 +191,54 @@ export default function InterviewEvaluationPage() {
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">Rounds Completed</div>
                 <div className="mt-1 text-2xl font-semibold">
-                  {evaluationData.interview_metrics?.rounds_completed || 0} / 5
+                  {evaluationData.interview_metrics?.rounds_completed ?? 0} / 5
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Criteria Scores (from Gemini analysis) */}
+        {(evaluationData.communication_quality != null || evaluationData.technical_knowledge != null || evaluationData.problem_solving != null) && (
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-4 text-xl font-semibold">Analysis Criteria</h2>
+            <p className="text-muted-foreground mb-4 text-sm">
+              Scores from AI analysis of your interview (0–10 per criterion).
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {evaluationData.communication_quality != null && (
+                <div className="rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="text-sm font-medium text-muted-foreground">Communication Quality</div>
+                  <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.communication_quality)}`}>
+                    {evaluationData.communication_quality.toFixed(1)} / 10
+                  </div>
+                </div>
+              )}
+              {evaluationData.technical_knowledge != null && (
+                <div className="rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="text-sm font-medium text-muted-foreground">Technical Knowledge</div>
+                  <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.technical_knowledge)}`}>
+                    {evaluationData.technical_knowledge.toFixed(1)} / 10
+                  </div>
+                </div>
+              )}
+              {evaluationData.problem_solving != null && (
+                <div className="rounded-lg border border-border bg-muted/50 p-4">
+                  <div className="text-sm font-medium text-muted-foreground">Problem Solving</div>
+                  <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.problem_solving)}`}>
+                    {evaluationData.problem_solving.toFixed(1)} / 10
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Overall Feedback (AI summary paragraph) */}
+        {evaluationData.overall_feedback && (
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-3 text-xl font-semibold">Overall Feedback</h2>
+            <p className="text-muted-foreground whitespace-pre-wrap">{evaluationData.overall_feedback}</p>
           </div>
         )}
 
@@ -444,7 +488,8 @@ export default function InterviewEvaluationPage() {
             )}
           </div>
         )}
+        </div>
       </div>
-    </Layout>
+    </div>
   );
 }

@@ -13,6 +13,7 @@ export default function AdminManageSlots() {
   const [editingSlot, setEditingSlot] = useState<SlotResponse | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [creatingDay, setCreatingDay] = useState(false);
+  const [creating, setCreating] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -51,14 +52,18 @@ export default function AdminManageSlots() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (creating) return;
     try {
       setError(null);
+      setCreating(true);
       await createSlot(formData);
       setShowCreateModal(false);
       setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
       await loadSlots();
     } catch (err) {
       setError((err as Error).message || 'Failed to create slot');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -458,16 +463,18 @@ export default function AdminManageSlots() {
               <div className="flex gap-4 pt-4">
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                  disabled={creating}
+                  className="flex-1 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {editingSlot ? 'Update Slot' : 'Create Slot'}
+                  {creating ? 'Creating...' : editingSlot ? 'Update Slot' : 'Create Slot'}
                 </button>
                 <button
                   type="button"
+                  disabled={creating}
                   onClick={() => {
                     setShowCreateModal(false);
                     setEditingSlot(null);
-                    setFormData({ slot_datetime: '', max_capacity: 30, notes: '' });
+                    setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
                   }}
                   className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
                 >

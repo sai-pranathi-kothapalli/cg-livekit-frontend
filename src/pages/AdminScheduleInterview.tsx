@@ -12,6 +12,7 @@ export default function AdminScheduleInterview() {
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [availableSlots, setAvailableSlots] = useState<SlotResponse[]>([]);
+  const [allSlotsCount, setAllSlotsCount] = useState<number>(0); // total from API (for message when all are past)
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
@@ -54,6 +55,7 @@ export default function AdminScheduleInterview() {
       });
 
       console.log(`[AdminScheduleInterview] Filtered to ${available.length} active future slots (including full slots)`);
+      setAllSlotsCount(allSlots.length);
       setAvailableSlots(available);
     } catch (err) {
       console.error('Failed to load available slots:', err);
@@ -356,7 +358,9 @@ export default function AdminScheduleInterview() {
 
                 {availableDates.length === 0 ? (
                   <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
-                    ⚠️ No available interview slots. Please create slots in the "Interview Slots" page first.
+                    {allSlotsCount > 0
+                      ? '⚠️ All your slots are in the past. Please create slots with a future date and time in the "Interview Slots" page (e.g. tomorrow or a later time today).'
+                      : '⚠️ No interview slots found. Please create slots in the "Interview Slots" page first.'}
                   </div>
                 ) : (
                   <>

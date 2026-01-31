@@ -3,6 +3,7 @@ import { TokenSource } from 'livekit-client';
 import { twMerge } from 'tailwind-merge';
 import { APP_CONFIG_DEFAULTS } from '@/app-config';
 import type { AppConfig } from '@/app-config';
+import { debug } from '@/lib/debug';
 
 export const CONFIG_ENDPOINT = import.meta.env.VITE_APP_CONFIG_ENDPOINT;
 export const SANDBOX_ID = import.meta.env.VITE_SANDBOX_ID;
@@ -58,12 +59,12 @@ export async function getAppConfig(_headers: Headers | null): Promise<AppConfig>
 
         return config;
       } else {
-        console.error(
+        debug.error(
           `ERROR: querying config endpoint failed with status ${response.status}: ${response.statusText}`
         );
       }
     } catch (error) {
-      console.error('ERROR: getAppConfig() - lib/utils.ts', error);
+      debug.error('ERROR: getAppConfig() - lib/utils.ts', error);
     }
   }
 
@@ -117,7 +118,7 @@ export function getSandboxTokenSource(appConfig: AppConfig) {
       });
       return await res.json();
     } catch (error) {
-      console.error('Error fetching connection details:', error);
+      debug.error('Error fetching connection details:', error);
       throw new Error('Error fetching connection details!');
     }
   });

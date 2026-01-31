@@ -1,29 +1,35 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { ThemeProvider } from './components/app/theme-provider';
 import { ThemeToggle } from './components/app/theme-toggle';
 import { Toaster } from './components/livekit/toaster';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Eager-load critical above-the-fold pages
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
-import JobsPage from './pages/JobsPage';
-import ApplyPage from './pages/ApplyPage';
-import InterviewPage from './pages/InterviewPage';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminJDEditor from './pages/AdminJDEditor';
-import AdminEnrollUser from './pages/AdminEnrollUser';
-import AdminManageUsers from './pages/AdminManageUsers';
-import AdminScheduleInterview from './pages/AdminScheduleInterview';
-import AdminManageSlots from './pages/AdminManageSlots';
-import UserApplicationForm from './pages/UserApplicationForm';
-import UserApplicationView from './pages/UserApplicationView';
-import StudentDashboard from './pages/StudentDashboard';
-import StudentProfile from './pages/StudentProfile';
-import StudentMyInterviews from './pages/StudentMyInterviews';
-import StudentApplicationForm from './pages/StudentApplicationForm';
-import InterviewEvaluationPage from './pages/InterviewEvaluationPage';
-import ChangePassword from './pages/ChangePassword';
-import ForgotPassword from './pages/ForgotPassword';
-import { ProtectedRoute } from './components/ProtectedRoute';
+
+// Route-level code splitting: lazy-load admin/student/interview pages
+const JobsPage = lazy(() => import('./pages/JobsPage'));
+const ApplyPage = lazy(() => import('./pages/ApplyPage'));
+const InterviewPage = lazy(() => import('./pages/InterviewPage'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const AdminJDEditor = lazy(() => import('./pages/AdminJDEditor'));
+const AdminEnrollUser = lazy(() => import('./pages/AdminEnrollUser'));
+const AdminManageUsers = lazy(() => import('./pages/AdminManageUsers'));
+const AdminScheduleInterview = lazy(() => import('./pages/AdminScheduleInterview'));
+const AdminManageSlots = lazy(() => import('./pages/AdminManageSlots'));
+const UserApplicationForm = lazy(() => import('./pages/UserApplicationForm'));
+const UserApplicationView = lazy(() => import('./pages/UserApplicationView'));
+const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
+const StudentProfile = lazy(() => import('./pages/StudentProfile'));
+const StudentMyInterviews = lazy(() => import('./pages/StudentMyInterviews'));
+const StudentApplicationForm = lazy(() => import('./pages/StudentApplicationForm'));
+const InterviewEvaluationPage = lazy(() => import('./pages/InterviewEvaluationPage'));
+const ChangePassword = lazy(() => import('./pages/ChangePassword'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 import { getAppConfig } from './lib/utils';
 import { getStyles } from './lib/utils';
 import type { AppConfig } from './app-config';
@@ -83,7 +89,9 @@ function App() {
       enableSystem={false}
       disableTransitionOnChange
     >
-      <Routes>
+      <ErrorBoundary>
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>}>
+        <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -210,6 +218,8 @@ function App() {
         <Route path="/user/application/view" element={<UserApplicationView />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+        </Suspense>
+      </ErrorBoundary>
       <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">
         <ThemeToggle className="translate-y-20 transition-transform delay-150 duration-300 group-hover:translate-y-0" />
       </div>

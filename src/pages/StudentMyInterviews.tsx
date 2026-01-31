@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentLayout from '@/components/StudentLayout';
 import { getMyInterview, type MyInterviewResponse } from '@/lib/api';
+import { debug } from '@/lib/debug';
 
 export default function StudentMyInterviews() {
   const navigate = useNavigate();
@@ -233,7 +234,7 @@ export default function StudentMyInterviews() {
                   const bookingToken = booking?.token || (typeof booking === 'string' ? booking : null);
                   
                   if (!bookingToken) {
-                    console.warn('Completed interview missing token:', item);
+                    debug.warn('Completed interview missing token:', item);
                     return null;
                   }
                   

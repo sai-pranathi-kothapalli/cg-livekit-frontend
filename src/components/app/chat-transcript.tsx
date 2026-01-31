@@ -3,6 +3,7 @@
 import { AnimatePresence, type HTMLMotionProps, motion } from 'motion/react';
 import { type ReceivedMessage } from '@livekit/components-react';
 import { ChatEntry } from '@/components/livekit/chat-entry';
+import { debug } from '@/lib/debug';
 
 const MotionContainer = motion.create('div');
 const MotionChatEntry = motion.create(ChatEntry);
@@ -62,7 +63,7 @@ export function ChatTranscript({
   ...props
 }: ChatTranscriptProps & Omit<HTMLMotionProps<'div'>, 'ref'>) {
   // Debug logging
-  console.log('📨 ChatTranscript render:', {
+  debug.log('📨 ChatTranscript render:', {
     hidden,
     messagesCount: messages.length,
     messages: messages.map(m => ({
@@ -74,12 +75,12 @@ export function ChatTranscript({
   });
 
   if (hidden) {
-    console.log('⚠️ ChatTranscript is hidden, returning null');
+    debug.log('⚠️ ChatTranscript is hidden, returning null');
     return null;
   }
 
   if (messages.length === 0) {
-    console.log('⚠️ ChatTranscript has no messages');
+    debug.log('⚠️ ChatTranscript has no messages');
   }
 
   return (
@@ -89,7 +90,7 @@ export function ChatTranscript({
     >
       <AnimatePresence mode="popLayout">
         {messages.map((receivedMessage, index) => {
-          console.log(`📝 Rendering message ${index}:`, {
+          debug.log(`📝 Rendering message ${index}:`, {
             id: receivedMessage.id,
             message: receivedMessage.message?.substring(0, 50),
           });

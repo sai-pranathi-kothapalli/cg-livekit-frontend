@@ -2,6 +2,7 @@
 
 import { useSessionContext, useAgent, useRemoteParticipants } from '@livekit/components-react';
 import { useEffect, useState } from 'react';
+import { debug } from '@/lib/debug';
 
 interface RoomStatusBarProps {
   timeRemaining?: number | null; // Time remaining in minutes
@@ -37,11 +38,11 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
     
     const handleOnline = () => {
       setIsOnline(true);
-      console.log('🌐 Internet connection restored');
+      debug.log('🌐 Internet connection restored');
     };
     const handleOffline = () => {
       setIsOnline(false);
-      console.warn('⚠️ Internet connection lost');
+      debug.warn('⚠️ Internet connection lost');
     };
     
     window.addEventListener('online', handleOnline);
@@ -66,9 +67,9 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
       const connected = state === 'connected';
       setIsLiveKitConnected(connected);
       if (connected) {
-        console.log('✅ LiveKit connected');
+        debug.log('✅ LiveKit connected');
       } else {
-        console.log(`🔌 LiveKit state: ${state}`);
+        debug.log(`🔌 LiveKit state: ${state}`);
       }
     };
 
@@ -79,12 +80,12 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
 
     const handleConnected = () => {
       setIsLiveKitConnected(true);
-      console.log('✅ LiveKit connected');
+      debug.log('✅ LiveKit connected');
     };
     
     const handleDisconnected = () => {
       setIsLiveKitConnected(false);
-      console.warn('❌ LiveKit disconnected');
+      debug.warn('❌ LiveKit disconnected');
     };
 
     room.on('connected', handleConnected);

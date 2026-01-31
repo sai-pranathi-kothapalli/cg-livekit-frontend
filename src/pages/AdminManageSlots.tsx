@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { getSlots, createSlot, updateSlot, createDaySlots, type SlotResponse, type UpdateSlotRequest } from '@/lib/api';
+import { debug } from '@/lib/debug';
 
 export default function AdminManageSlots() {
   const [slots, setSlots] = useState<SlotResponse[]>([]);
@@ -83,7 +84,7 @@ export default function AdminManageSlots() {
           }
         }
       } catch (e) {
-        console.warn('Could not calculate duration from slot times:', e);
+        debug.warn('Could not calculate duration from slot times:', e);
       }
     }
     setFormData({

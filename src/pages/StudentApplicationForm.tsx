@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentLayout from '@/components/StudentLayout';
 import { getApplicationForm, submitApplicationForm, uploadApplicationForm, type ApplicationFormResponse, type ApplicationFormSubmitRequest } from '@/lib/api';
+import { debug } from '@/lib/debug';
 
 export default function StudentApplicationForm() {
   const navigate = useNavigate();
@@ -91,7 +92,7 @@ export default function StudentApplicationForm() {
         }
       }
     } catch (err) {
-      console.error('Failed to load form:', err);
+      debug.error('Failed to load form:', err);
     } finally {
       setChecking(false);
     }

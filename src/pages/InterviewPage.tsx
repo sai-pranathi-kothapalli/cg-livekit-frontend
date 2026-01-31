@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { App } from '@/components/app/app';
 import { getBooking, getInterviewAccessConfig } from '@/lib/api';
 import { getAppConfig } from '@/lib/utils';
+import { debug } from '@/lib/debug';
 import type { AppConfig } from '@/app-config';
 import { APP_CONFIG_DEFAULTS } from '@/app-config';
 import { useAuth } from '@/contexts/AuthContext';
@@ -104,7 +105,7 @@ export default function InterviewPage() {
 
         setLoading(false);
       } catch (err: any) {
-        console.error('[InterviewPage] Error:', err);
+        debug.error('[InterviewPage] Error:', err);
         // Handle authentication errors
         if (err.message?.includes('401') || err.message?.includes('Authentication required')) {
           setError('authentication_required');

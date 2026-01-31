@@ -12,6 +12,7 @@ import { Toaster } from '@/components/livekit/toaster';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
 import { useDebugMode } from '@/hooks/useDebug';
 import { getSandboxTokenSource } from '@/lib/utils';
+import { debug } from '@/lib/debug';
 
 const IN_DEVELOPMENT = import.meta.env.DEV;
 
@@ -46,7 +47,7 @@ export function App({ appConfig, interviewToken, interviewDuration, scheduledAt 
             : undefined,
           token: interviewToken,
         };
-        console.log('[Frontend] 📤 Requesting connection details:', {
+        debug.log('[Frontend] 📤 Requesting connection details:', {
           url: `${API_BASE_URL}/api/connection-details`,
           agentName: appConfig.agentName,
           requestBody,
@@ -65,11 +66,11 @@ export function App({ appConfig, interviewToken, interviewDuration, scheduledAt 
         });
         if (!res.ok) {
           const error = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
-          console.error('[Frontend] ❌ Connection details request failed:', error);
+          debug.error('[Frontend] ❌ Connection details request failed:', error);
           throw new Error(error.detail || `Failed to get connection details: ${res.statusText}`);
         }
         const response = await res.json();
-        console.log('[Frontend] ✅ Received connection details:', {
+        debug.log('[Frontend] ✅ Received connection details:', {
           serverUrl: response.serverUrl,
           roomName: response.roomName,
           participantName: response.participantName,
@@ -90,7 +91,7 @@ export function App({ appConfig, interviewToken, interviewDuration, scheduledAt 
           ? { agents: [{ agent_name: appConfig.agentName }] }
           : undefined,
       };
-      console.log('[Frontend] 📤 Requesting connection details (no token):', {
+      debug.log('[Frontend] 📤 Requesting connection details (no token):', {
         url: `${API_BASE_URL}/api/connection-details`,
         agentName: appConfig.agentName,
         requestBody,
@@ -102,11 +103,11 @@ export function App({ appConfig, interviewToken, interviewDuration, scheduledAt 
       });
       if (!res.ok) {
         const error = await res.json().catch(() => ({ detail: `HTTP ${res.status}: ${res.statusText}` }));
-        console.error('[Frontend] ❌ Connection details request failed:', error);
+        debug.error('[Frontend] ❌ Connection details request failed:', error);
         throw new Error(error.detail || `Failed to get connection details: ${res.statusText}`);
       }
       const response = await res.json();
-      console.log('[Frontend] ✅ Received connection details:', {
+      debug.log('[Frontend] ✅ Received connection details:', {
         serverUrl: response.serverUrl,
         roomName: response.roomName,
         participantName: response.participantName,

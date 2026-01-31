@@ -13,6 +13,7 @@ import {
 } from '@phosphor-icons/react/dist/ssr';
 import { Toggle } from '@/components/livekit/toggle';
 import { cn } from '@/lib/utils';
+import { debug } from '@/lib/debug';
 
 function getSourceIcon(source: Track.Source, enabled: boolean, pending = false) {
   if (pending) {
@@ -40,7 +41,7 @@ export function TrackToggle({ source, pressed, pending, className, onPressedChan
   const IconComponent = getSourceIcon(source, pressed ?? false, pending);
 
   const handlePressedChange = React.useCallback((newPressed: boolean) => {
-    console.log(`[TrackToggle] ${source} pressed change:`, { 
+    debug.log(`[TrackToggle] ${source} pressed change:`, { 
       from: pressed, 
       to: newPressed, 
       pending,

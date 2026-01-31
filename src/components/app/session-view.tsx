@@ -13,6 +13,7 @@ import {
   type ControlBarControls,
 } from '@/components/livekit/agent-control-bar/agent-control-bar';
 import { cn } from '@/lib/utils';
+import { debug } from '@/lib/debug';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
 import { RoomStatusBar } from '@/components/app/room-status-bar';
 
@@ -192,7 +193,7 @@ export const SessionView = ({
   
   // DEBUG: Log all messages to verify reception
   useEffect(() => {
-    console.log('📨 MESSAGES DEBUG:', {
+    debug.log('📨 MESSAGES DEBUG:', {
       totalMessages: allMessages.length,
       regularMessages: messages.length,
       manualMessages: manualTranscriptMessages.length,
@@ -200,20 +201,20 @@ export const SessionView = ({
     
     // Log FULL message details
     if (allMessages.length > 0) {
-      console.log('📋 FULL MESSAGE DETAILS:', JSON.stringify(allMessages[0], null, 2));
-      console.log('📋 Message content:', allMessages[0].message);
-      console.log('📋 Message from:', allMessages[0].from);
-      console.log('📋 Message type:', allMessages[0].type);
-      console.log('📋 Is local?', allMessages[0].from?.isLocal);
-      console.log('📋 From identity:', allMessages[0].from?.identity);
+      debug.log('📋 FULL MESSAGE DETAILS:', JSON.stringify(allMessages[0], null, 2));
+      debug.log('📋 Message content:', allMessages[0].message);
+      debug.log('📋 Message from:', allMessages[0].from);
+      debug.log('📋 Message type:', allMessages[0].type);
+      debug.log('📋 Is local?', allMessages[0].from?.isLocal);
+      debug.log('📋 From identity:', allMessages[0].from?.identity);
     }
     
     const agentMessages = allMessages.filter(msg => !msg.from?.isLocal);
-    console.log('🤖 AGENT MESSAGES COUNT:', agentMessages.length);
+    debug.log('🤖 AGENT MESSAGES COUNT:', agentMessages.length);
     if (agentMessages.length > 0) {
-      console.log('🤖 AGENT MESSAGES FULL:', agentMessages);
+      debug.log('🤖 AGENT MESSAGES FULL:', agentMessages);
       agentMessages.forEach((msg, idx) => {
-        console.log(`🤖 Agent Message ${idx}:`, {
+        debug.log(`🤖 Agent Message ${idx}:`, {
           id: msg.id,
           message: msg.message,
           from: msg.from,
@@ -271,22 +272,22 @@ export const SessionView = ({
           const element = document.documentElement; // Full page fullscreen
           if (element.requestFullscreen) {
             await element.requestFullscreen();
-            console.log('✅ Entered fullscreen mode');
+            debug.log('✅ Entered fullscreen mode');
           } else if ((element as any).webkitRequestFullscreen) {
             // Safari
             await (element as any).webkitRequestFullscreen();
-            console.log('✅ Entered fullscreen mode (Safari)');
+            debug.log('✅ Entered fullscreen mode (Safari)');
           } else if ((element as any).mozRequestFullScreen) {
             // Firefox
             await (element as any).mozRequestFullScreen();
-            console.log('✅ Entered fullscreen mode (Firefox)');
+            debug.log('✅ Entered fullscreen mode (Firefox)');
           } else if ((element as any).msRequestFullscreen) {
             // IE/Edge
             await (element as any).msRequestFullscreen();
-            console.log('✅ Entered fullscreen mode (IE/Edge)');
+            debug.log('✅ Entered fullscreen mode (IE/Edge)');
           }
         } catch (error) {
-          console.warn('⚠️ Failed to enter fullscreen:', error);
+          debug.warn('⚠️ Failed to enter fullscreen:', error);
           // Fullscreen might be blocked by browser policy, continue anyway
         }
       };
@@ -307,22 +308,22 @@ export const SessionView = ({
         try {
           if (document.fullscreenElement) {
             await document.exitFullscreen();
-            console.log('✅ Exited fullscreen mode');
+            debug.log('✅ Exited fullscreen mode');
           } else if ((document as any).webkitFullscreenElement) {
             // Safari
             await (document as any).webkitExitFullscreen();
-            console.log('✅ Exited fullscreen mode (Safari)');
+            debug.log('✅ Exited fullscreen mode (Safari)');
           } else if ((document as any).mozFullScreenElement) {
             // Firefox
             await (document as any).mozCancelFullScreen();
-            console.log('✅ Exited fullscreen mode (Firefox)');
+            debug.log('✅ Exited fullscreen mode (Firefox)');
           } else if ((document as any).msFullscreenElement) {
             // IE/Edge
             await (document as any).msExitFullscreen();
-            console.log('✅ Exited fullscreen mode (IE/Edge)');
+            debug.log('✅ Exited fullscreen mode (IE/Edge)');
           }
         } catch (error) {
-          console.warn('⚠️ Failed to exit fullscreen:', error);
+          debug.warn('⚠️ Failed to exit fullscreen:', error);
         }
       };
       
@@ -346,7 +347,7 @@ export const SessionView = ({
       // If user manually exits fullscreen during interview, we can optionally re-enter
       // But for now, we'll respect their choice and not force it back
       if (!isFullscreen && session.isConnected && !isInterviewCompleted) {
-        console.log('ℹ️ User exited fullscreen manually');
+        debug.log('ℹ️ User exited fullscreen manually');
       }
     };
     
@@ -376,7 +377,7 @@ export const SessionView = ({
       // If time is up, trigger interview completion
       if (remaining <= 0 && !isInterviewCompleted) {
         setTimeRemaining(0);
-        console.log('⏰ Timer reached 00:00 - triggering interview completion');
+        debug.log('⏰ Timer reached 00:00 - triggering interview completion');
         
         // Mark as completed
         setIsInterviewCompleted(true);
@@ -395,9 +396,9 @@ export const SessionView = ({
               new TextEncoder().encode(completionSignal),
               { topic: 'lk-chat', reliable: true }
             );
-            console.log('✅ Sent time limit reached signal to agent');
+            debug.log('✅ Sent time limit reached signal to agent');
           } catch (e) {
-            console.warn('⚠️ Failed to send time limit signal:', e);
+            debug.warn('⚠️ Failed to send time limit signal:', e);
           }
         }
         
@@ -405,7 +406,7 @@ export const SessionView = ({
         if (interviewToken) {
           setTimeout(() => {
             const evaluationUrl = `/evaluation/${interviewToken}`;
-            console.log('🔄 Redirecting to evaluation page:', evaluationUrl);
+            debug.log('🔄 Redirecting to evaluation page:', evaluationUrl);
             window.location.href = evaluationUrl;
           }, 3000); // 3 second delay to allow agent to finish speaking
         }
@@ -434,18 +435,18 @@ export const SessionView = ({
       // Create a function to get room info that can be called from console
       (window as any).getRoomInfo = () => {
         if (!room) {
-          console.log('❌ No room connected');
+          debug.log('❌ No room connected');
           return;
         }
         
-        console.log('🏠 ROOM INFORMATION:');
-        console.log('   Room Name:', room.name);
-        console.log('   Room SID:', (room as any).sid || 'N/A');
-        console.log('   Room State:', room.state);
+        debug.log('🏠 ROOM INFORMATION:');
+        debug.log('   Room Name:', room.name);
+        debug.log('   Room SID:', (room as any).sid || 'N/A');
+        debug.log('   Room State:', room.state);
         
         // Log local participant
         if (room.localParticipant) {
-          console.log('   Local Participant:', {
+          debug.log('   Local Participant:', {
             identity: room.localParticipant.identity,
             sid: room.localParticipant.sid,
             name: room.localParticipant.name,
@@ -455,14 +456,14 @@ export const SessionView = ({
         // Log remote participants
         const remoteParticipants = Array.from(room.remoteParticipants.values());
         if (remoteParticipants.length > 0) {
-          console.log('   Remote Participants:', remoteParticipants.map(p => ({
+          debug.log('   Remote Participants:', remoteParticipants.map(p => ({
             identity: p.identity,
             sid: p.sid,
             name: p.name,
             isAgent: p.isAgent,
           })));
         } else {
-          console.log('   Remote Participants: None');
+          debug.log('   Remote Participants: None');
         }
         
         return {
@@ -484,7 +485,7 @@ export const SessionView = ({
       
       // Log participant join/leave events to console
       const handleParticipantConnected = (participant: any) => {
-        console.log('✅ PARTICIPANT JOINED:', {
+        debug.log('✅ PARTICIPANT JOINED:', {
           identity: participant.identity,
           sid: participant.sid,
           name: participant.name,
@@ -494,7 +495,7 @@ export const SessionView = ({
       };
       
       const handleParticipantDisconnected = (participant: any, reason?: string) => {
-        console.log('❌ PARTICIPANT LEFT:', {
+        debug.log('❌ PARTICIPANT LEFT:', {
           identity: participant.identity,
           sid: participant.sid,
           name: participant.name,
@@ -512,7 +513,7 @@ export const SessionView = ({
           const text = decoder.decode(payload);
           const data = JSON.parse(text);
           
-          console.log('📡 DATA CHANNEL MESSAGE RECEIVED:', {
+          debug.log('📡 DATA CHANNEL MESSAGE RECEIVED:', {
             topic,
             participant: participant?.identity,
             participantSid: participant?.sid,
@@ -524,14 +525,14 @@ export const SessionView = ({
           
           // Check for interview warning (2 minutes before end)
           if (data.type === 'interview_warning') {
-            console.log('⚠️ Interview warning received:', data.message);
+            debug.log('⚠️ Interview warning received:', data.message);
             // Could show a toast notification here
             return;
           }
           
           // Check for time remaining update
           if (data.type === 'time_remaining') {
-            console.log('⏰ Time remaining update received:', data.time_remaining_minutes);
+            debug.log('⏰ Time remaining update received:', data.time_remaining_minutes);
             if (typeof data.time_remaining_minutes === 'number') {
               setTimeRemaining(data.time_remaining_minutes);
             }
@@ -540,7 +541,7 @@ export const SessionView = ({
           
           // Check for interview completion signal
           if (data.type === 'interview_completed') {
-            console.log('✅ Interview completed signal received:', data);
+            debug.log('✅ Interview completed signal received:', data);
             
             // Mark interview as completed (this will trigger fullscreen exit)
             setIsInterviewCompleted(true);
@@ -549,20 +550,20 @@ export const SessionView = ({
             const token = data.token || interviewToken;
             
             if (!token) {
-              console.warn('⚠️ Interview completed but no token available for redirect');
+              debug.warn('⚠️ Interview completed but no token available for redirect');
               return;
             }
             
             // Show completion message
             if (data.message) {
-              console.log('📢 Completion message:', data.message);
+              debug.log('📢 Completion message:', data.message);
               // You could show a toast/notification here if needed
             }
             
             // Redirect to evaluation page after a short delay (allow time for final data save)
             setTimeout(() => {
               const evaluationUrl = `/evaluation/${token}`;
-              console.log('🔄 Redirecting to evaluation page:', evaluationUrl);
+              debug.log('🔄 Redirecting to evaluation page:', evaluationUrl);
               window.location.href = evaluationUrl;
             }, 3000); // 3 second delay to allow final data to be saved and closing message to finish
             
@@ -575,7 +576,7 @@ export const SessionView = ({
           const isUserTranscript = data.type === 'userTranscript'; // Accept from any participant (agent sends it)
           
           if (data.message && typeof data.message === 'string' && (isAgentTranscript || isUserTranscript)) {
-            console.log(`✅ ${data.type} MESSAGE DETECTED:`, data.message.substring(0, 50));
+            debug.log(`✅ ${data.type} MESSAGE DETECTED:`, data.message.substring(0, 50));
             
             // For userTranscript, display as local (candidate) message; for agentTranscript use sending participant
             const displayFrom = isUserTranscript && room.localParticipant ? room.localParticipant : participant;
@@ -609,24 +610,24 @@ export const SessionView = ({
                 const existing = prev[existingIndex];
                 // If new message is longer (full replacing partial), update it
                 if (data.message.length > (existing.message?.length || 0)) {
-                  console.log('🔄 Updating existing transcript message with longer version');
+                  debug.log('🔄 Updating existing transcript message with longer version');
                   const updated = [...prev];
                   updated[existingIndex] = transcriptMessage;
                   return updated;
                 } else {
                   // New message is same or shorter, skip to avoid duplicates
-                  console.log('⚠️ Duplicate or shorter transcript message, skipping');
+                  debug.log('⚠️ Duplicate or shorter transcript message, skipping');
                   return prev;
                 }
               }
               
               // No existing message found, add new one
-              console.log('✅ Adding new transcript message to manual messages state');
+              debug.log('✅ Adding new transcript message to manual messages state');
               return [...prev, transcriptMessage];
             });
           }
         } catch (e) {
-          console.log('📡 DATA CHANNEL MESSAGE (non-JSON):', {
+          debug.log('📡 DATA CHANNEL MESSAGE (non-JSON):', {
             topic,
             participant: participant?.identity,
             payload: new TextDecoder().decode(payload).substring(0, 100),
@@ -635,7 +636,7 @@ export const SessionView = ({
         }
       };
       
-      console.log('🔧 Registering event handlers...');
+      debug.log('🔧 Registering event handlers...');
       
       // Register event handlers
       room.on('participantConnected', handleParticipantConnected);
@@ -645,7 +646,7 @@ export const SessionView = ({
       // Note: In LiveKit, dataReceived is a room-level event, not participant-level
       // The room.on('dataReceived') should handle all data channel messages
       
-      console.log('✅ Data channel handler registered');
+      debug.log('✅ Data channel handler registered');
       
       return () => {
         room.off('participantConnected', handleParticipantConnected);
@@ -670,10 +671,10 @@ export const SessionView = ({
 
   // Handle streaming text display for agent messages
   useEffect(() => {
-    console.log('🔄 Processing messages for display:', allMessages.length);
+    debug.log('🔄 Processing messages for display:', allMessages.length);
     allMessages.forEach((msg, idx) => {
       const isAgentMessage = !msg.from?.isLocal;
-      console.log(`📝 Processing message ${idx}:`, {
+      debug.log(`📝 Processing message ${idx}:`, {
         id: msg.id,
         isAgentMessage,
         message: msg.message?.substring(0, 50),
@@ -709,7 +710,7 @@ export const SessionView = ({
             const existing = prev.find(m => m.id === msg.id);
             if (existing && msg.message.length > existing.message.length && msg.message.startsWith(existing.message)) {
               // This is a longer version, replace it
-              console.log('🔄 Replacing partial streaming message with full version');
+              debug.log('🔄 Replacing partial streaming message with full version');
               // Clean up existing streaming interval
               if (streamingIntervals.current.has(existing.id)) {
                 const interval = streamingIntervals.current.get(existing.id);
@@ -774,7 +775,7 @@ export const SessionView = ({
         };
         
         streamingMessageIds.current.add(msg.id);
-        console.log('➕ Adding message to streamingMessages:', {
+        debug.log('➕ Adding message to streamingMessages:', {
           id: msg.id,
           message: fullText.substring(0, 50),
           initialDisplayedLength: currentDisplayLength,
@@ -784,7 +785,7 @@ export const SessionView = ({
         setStreamingMessages(prev => {
           // Check for duplicates by ID
           if (prev.some(m => m.id === msg.id)) {
-            console.log('⚠️ Message already in streamingMessages (by ID), skipping');
+            debug.log('⚠️ Message already in streamingMessages (by ID), skipping');
             return prev;
           }
           
@@ -800,14 +801,14 @@ export const SessionView = ({
             
             // Exact match
             if (existingText === fullText) {
-              console.log('⚠️ Message already in streamingMessages (exact match), skipping');
+              debug.log('⚠️ Message already in streamingMessages (exact match), skipping');
               return prev;
             }
             
             // Check if one is a prefix of another (partial vs full message)
             if (fullText.startsWith(existingText)) {
               // New message is longer (full), replace old partial one
-              console.log('🔄 Replacing partial message with full message (removing partial)');
+              debug.log('🔄 Replacing partial message with full message (removing partial)');
               // Remove the partial message and its streaming interval if it exists
               if (streamingIntervals.current.has(existingMsg.id)) {
                 const interval = streamingIntervals.current.get(existingMsg.id);
@@ -820,17 +821,17 @@ export const SessionView = ({
                 .concat([streamingMsg]); // Add full message
             } else if (existingText.startsWith(fullText)) {
               // Existing message is longer (full), skip new partial one
-              console.log('⚠️ Message already in streamingMessages (existing is full, new is partial), skipping');
+              debug.log('⚠️ Message already in streamingMessages (existing is full, new is partial), skipping');
               return prev;
             }
           }
           
-          console.log('✅ Adding new message to streamingMessages, new count:', prev.length + 1);
+          debug.log('✅ Adding new message to streamingMessages, new count:', prev.length + 1);
           return [...prev, streamingMsg];
         });
         
         // Stream progressively (character-by-character for short, word-by-word for long)
-        console.log(`🎬 Starting streaming interval for message ${msg.id} (${useCharacterStreaming ? 'character' : 'word'} mode)`);
+        debug.log(`🎬 Starting streaming interval for message ${msg.id} (${useCharacterStreaming ? 'character' : 'word'} mode)`);
         const streamInterval = setInterval(() => {
           // Read current displayedLength from state to ensure we're always in sync
           setStreamingMessages(prev => {
@@ -869,7 +870,7 @@ export const SessionView = ({
               // Clamp to total length
               newLength = Math.min(newLength, totalLength);
               
-              console.log(`📊 Streaming update for ${msg.id}:`, {
+              debug.log(`📊 Streaming update for ${msg.id}:`, {
                 currentLength,
                 newLength,
                 totalLength,
@@ -890,7 +891,7 @@ export const SessionView = ({
               );
             } else {
               // Streaming complete
-              console.log(`✅ Streaming complete for ${msg.id}`);
+              debug.log(`✅ Streaming complete for ${msg.id}`);
               clearInterval(streamInterval);
               streamingIntervals.current.delete(msg.id);
               streamingMessageIds.current.delete(msg.id);
@@ -939,7 +940,7 @@ export const SessionView = ({
   }, []);
 
   useEffect(() => {
-    console.log('📺 Streaming messages state:', {
+    debug.log('📺 Streaming messages state:', {
       count: streamingMessages.length,
       messages: streamingMessages.map(m => ({
         id: m.id,
@@ -951,7 +952,7 @@ export const SessionView = ({
     });
     
     // Log what ChatTranscript will receive
-    console.log('📤 ChatTranscript will receive:', {
+    debug.log('📤 ChatTranscript will receive:', {
       hidden: !chatOpen,
       chatOpen,
       messagesCount: streamingMessages.length,
@@ -1085,14 +1086,14 @@ export const SessionView = ({
                       await (document as any).msExitFullscreen();
                     }
                   } catch (error) {
-                    console.warn('Failed to exit fullscreen:', error);
+                    debug.warn('Failed to exit fullscreen:', error);
                   }
                   
                   // Disconnect from session
                   try {
                     await session.end();
                   } catch (error) {
-                    console.warn('Failed to disconnect:', error);
+                    debug.warn('Failed to disconnect:', error);
                   }
                   
                   // Redirect to evaluation page
@@ -1101,11 +1102,11 @@ export const SessionView = ({
                     // Small delay to ensure disconnect is processed and transcript is saved
                     setTimeout(() => {
                       const evaluationUrl = `/evaluation/${token}`;
-                      console.log('🔄 Redirecting to evaluation page:', evaluationUrl);
+                      debug.log('🔄 Redirecting to evaluation page:', evaluationUrl);
                       window.location.href = evaluationUrl;
                     }, 1500); // Increased delay to ensure backend processes the disconnect
                   } else {
-                    console.warn('⚠️ No interview token available for redirect');
+                    debug.warn('⚠️ No interview token available for redirect');
                     // Fallback: redirect to home or my interviews
                     setTimeout(() => {
                       window.location.href = '/my-interviews';

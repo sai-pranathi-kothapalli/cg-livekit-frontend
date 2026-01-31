@@ -7,6 +7,7 @@ import {
   useTrackToggle,
   useMaybeRoomContext,
 } from '@livekit/components-react';
+import { debug } from '@/lib/debug';
 
 export interface UseInputControlsProps {
   saveUserChoices?: boolean;
@@ -34,7 +35,7 @@ export function useInputControls({
   
   // Debug: Check room availability
   useEffect(() => {
-    console.log('[useInputControls] Room context:', {
+    debug.log('[useInputControls] Room context:', {
       hasRoom: !!room,
       roomState: room?.state,
       roomName: room?.name,
@@ -46,7 +47,7 @@ export function useInputControls({
   const microphoneToggle = useTrackToggle({
     source: Track.Source.Microphone,
     onDeviceError: (error) => {
-      console.error('[useInputControls] Microphone device error:', error);
+      debug.error('[useInputControls] Microphone device error:', error);
       onDeviceError?.({ source: Track.Source.Microphone, error });
     },
   });
@@ -54,7 +55,7 @@ export function useInputControls({
   const cameraToggle = useTrackToggle({
     source: Track.Source.Camera,
     onDeviceError: (error) => {
-      console.error('[useInputControls] Camera device error:', error);
+      debug.error('[useInputControls] Camera device error:', error);
       onDeviceError?.({ source: Track.Source.Camera, error });
     },
   });
@@ -62,7 +63,7 @@ export function useInputControls({
   const screenShareToggle = useTrackToggle({
     source: Track.Source.ScreenShare,
     onDeviceError: (error) => {
-      console.error('[useInputControls] ScreenShare device error:', error);
+      debug.error('[useInputControls] ScreenShare device error:', error);
       onDeviceError?.({ source: Track.Source.ScreenShare, error });
     },
   });
@@ -99,16 +100,16 @@ export function useInputControls({
   const handleToggleCamera = useCallback(
     async (enabled?: boolean) => {
       try {
-        console.log('[useInputControls] Toggling camera:', { enabled, currentState: cameraToggle.enabled, pending: cameraToggle.pending });
+        debug.log('[useInputControls] Toggling camera:', { enabled, currentState: cameraToggle.enabled, pending: cameraToggle.pending });
         if (screenShareToggle.enabled) {
           await screenShareToggle.toggle(false);
         }
         await cameraToggle.toggle(enabled);
-        console.log('[useInputControls] Camera toggle completed:', { newState: cameraToggle.enabled });
+        debug.log('[useInputControls] Camera toggle completed:', { newState: cameraToggle.enabled });
         // persist video input enabled preference
         saveVideoInputEnabled(!cameraToggle.enabled);
       } catch (error) {
-        console.error('[useInputControls] Camera toggle failed:', error);
+        debug.error('[useInputControls] Camera toggle failed:', error);
         onDeviceError?.({ source: Track.Source.Camera, error: error as Error });
       }
     },
@@ -118,13 +119,13 @@ export function useInputControls({
   const handleToggleMicrophone = useCallback(
     async (enabled?: boolean) => {
       try {
-        console.log('[useInputControls] Toggling microphone:', { enabled, currentState: microphoneToggle.enabled, pending: microphoneToggle.pending });
+        debug.log('[useInputControls] Toggling microphone:', { enabled, currentState: microphoneToggle.enabled, pending: microphoneToggle.pending });
         await microphoneToggle.toggle(enabled);
-        console.log('[useInputControls] Microphone toggle completed:', { newState: microphoneToggle.enabled });
+        debug.log('[useInputControls] Microphone toggle completed:', { newState: microphoneToggle.enabled });
         // persist audio input enabled preference
         saveAudioInputEnabled(!microphoneToggle.enabled);
       } catch (error) {
-        console.error('[useInputControls] Microphone toggle failed:', error);
+        debug.error('[useInputControls] Microphone toggle failed:', error);
         onDeviceError?.({ source: Track.Source.Microphone, error: error as Error });
       }
     },
@@ -134,14 +135,14 @@ export function useInputControls({
   const handleToggleScreenShare = useCallback(
     async (enabled?: boolean) => {
       try {
-        console.log('[useInputControls] Toggling screen share:', { enabled, currentState: screenShareToggle.enabled, pending: screenShareToggle.pending });
+        debug.log('[useInputControls] Toggling screen share:', { enabled, currentState: screenShareToggle.enabled, pending: screenShareToggle.pending });
         if (cameraToggle.enabled) {
           await cameraToggle.toggle(false);
         }
         await screenShareToggle.toggle(enabled);
-        console.log('[useInputControls] Screen share toggle completed:', { newState: screenShareToggle.enabled });
+        debug.log('[useInputControls] Screen share toggle completed:', { newState: screenShareToggle.enabled });
       } catch (error) {
-        console.error('[useInputControls] Screen share toggle failed:', error);
+        debug.error('[useInputControls] Screen share toggle failed:', error);
         onDeviceError?.({ source: Track.Source.ScreenShare, error: error as Error });
       }
     },

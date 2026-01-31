@@ -11,6 +11,7 @@ import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle
 import { Button } from '@/components/livekit/button';
 // import { Toggle } from '@/components/livekit/toggle';
 import { cn } from '@/lib/utils';
+import { debug } from '@/lib/debug';
 // import { ChatInput } from './chat-input';
 import { UseInputControlsProps, useInputControls } from './hooks/use-input-controls';
 import { usePublishPermissions } from './hooks/use-publish-permissions';
@@ -54,7 +55,7 @@ export function AgentControlBar({
   
   // Enhanced error handler with logging and user-friendly messages
   const handleDeviceError = useCallback((error: { source: Track.Source; error: Error }) => {
-    console.error('[AgentControlBar] Device error:', {
+    debug.error('[AgentControlBar] Device error:', {
       source: error.source,
       error: error.error,
       message: error.error.message,
@@ -235,7 +236,7 @@ export function AgentControlBar({
     const hasMediaDevices = typeof navigator !== 'undefined' && !!navigator.mediaDevices;
     
     if (protocol === 'http:' && !isLocalhost && !hasMediaDevices) {
-      console.warn('[AgentControlBar] ⚠️ Media devices unavailable due to HTTP (non-localhost):', {
+      debug.warn('[AgentControlBar] ⚠️ Media devices unavailable due to HTTP (non-localhost):', {
         protocol,
         hostname,
         hasMediaDevices,
@@ -246,7 +247,7 @@ export function AgentControlBar({
   
   // Debug logging
   React.useEffect(() => {
-    console.log('[AgentControlBar] State:', {
+    debug.log('[AgentControlBar] State:', {
       isConnected,
       publishPermissions,
       microphoneEnabled: microphoneToggle.enabled,
@@ -318,11 +319,11 @@ export function AgentControlBar({
               disabled={microphoneToggle.pending || !isConnected}
               audioTrackRef={micTrackRef}
               onPressedChange={(pressed) => {
-                console.log('[AgentControlBar] Mic button clicked:', { pressed, isConnected, pending: microphoneToggle.pending });
+                debug.log('[AgentControlBar] Mic button clicked:', { pressed, isConnected, pending: microphoneToggle.pending });
                 if (isConnected && !microphoneToggle.pending) {
                   microphoneToggle.toggle(pressed);
                 } else {
-                  console.warn('[AgentControlBar] Mic toggle blocked:', { isConnected, pending: microphoneToggle.pending });
+                  debug.warn('[AgentControlBar] Mic toggle blocked:', { isConnected, pending: microphoneToggle.pending });
                 }
               }}
               onMediaDeviceError={handleMicrophoneDeviceSelectError}
@@ -340,11 +341,11 @@ export function AgentControlBar({
               pending={cameraToggle.pending}
               disabled={cameraToggle.pending || !isConnected}
               onPressedChange={(pressed) => {
-                console.log('[AgentControlBar] Camera button clicked:', { pressed, isConnected, pending: cameraToggle.pending });
+                debug.log('[AgentControlBar] Camera button clicked:', { pressed, isConnected, pending: cameraToggle.pending });
                 if (isConnected && !cameraToggle.pending) {
                   cameraToggle.toggle(pressed);
                 } else {
-                  console.warn('[AgentControlBar] Camera toggle blocked:', { isConnected, pending: cameraToggle.pending });
+                  debug.warn('[AgentControlBar] Camera toggle blocked:', { isConnected, pending: cameraToggle.pending });
                 }
               }}
               onMediaDeviceError={handleCameraDeviceSelectError}
@@ -362,11 +363,11 @@ export function AgentControlBar({
               pressed={screenShareToggle.enabled}
               disabled={screenShareToggle.pending || !isConnected}
               onPressedChange={(pressed) => {
-                console.log('[AgentControlBar] Screen share button clicked:', { pressed, isConnected, pending: screenShareToggle.pending });
+                debug.log('[AgentControlBar] Screen share button clicked:', { pressed, isConnected, pending: screenShareToggle.pending });
                 if (isConnected && !screenShareToggle.pending) {
                   screenShareToggle.toggle(pressed);
                 } else {
-                  console.warn('[AgentControlBar] Screen share toggle blocked:', { isConnected, pending: screenShareToggle.pending });
+                  debug.warn('[AgentControlBar] Screen share toggle blocked:', { isConnected, pending: screenShareToggle.pending });
                 }
               }}
             />

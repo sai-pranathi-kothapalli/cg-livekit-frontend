@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { debug } from '@/lib/debug';
 
 interface RRBFormData {
   // Personal Details
@@ -163,7 +164,7 @@ export default function UserApplicationForm() {
         const draft = JSON.parse(saved);
         setFormData(draft);
       } catch (e) {
-        console.error('Failed to load draft:', e);
+        debug.error('Failed to load draft:', e);
       }
     }
   }, []);

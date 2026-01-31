@@ -10,6 +10,7 @@ import {
   useVoiceAssistant,
 } from '@livekit/components-react';
 import { cn } from '@/lib/utils';
+import { debug } from '@/lib/debug';
 
 const MotionContainer = motion.create('div');
 
@@ -66,12 +67,12 @@ export function TileLayout({ chatOpen, layoutMode = 'side-by-side' }: TileLayout
   );
   
   // Debug log to see who else is in the room
-  console.log('Local participant identity:', localParticipant.identity);
-  console.log('All video tracks:', allVideoTracks.map(t => ({ 
+  debug.log('Local participant identity:', localParticipant.identity);
+  debug.log('All video tracks:', allVideoTracks.map(t => ({ 
     identity: t.participant.identity, 
     isLocal: t.participant.isLocal 
   })));
-  console.log('Remote participants:', remoteVideoTracks.map(t => t.participant.identity));
+  debug.log('Remote participants:', remoteVideoTracks.map(t => t.participant.identity));
 
   const tavusTrack = remoteVideoTracks.find(
     (t) => t.participant.identity !== 'local' && t.participant.identity !== ''

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getAllUsers, scheduleInterviewForUser, bulkScheduleInterviews, getSlots, type UserResponse, type BulkScheduleInterviewResponse, type SlotResponse } from '@/lib/api';
 import AdminLayout from '@/components/AdminLayout';
+import { debug } from '@/lib/debug';
 import * as XLSX from 'xlsx';
 
 export default function AdminScheduleInterview() {
@@ -39,7 +40,7 @@ export default function AdminScheduleInterview() {
       // Filter client-side for active slots in the future (show all, even if full)
       const allSlots = await getSlots(undefined, true);
       
-      console.log(`[AdminScheduleInterview] Loaded ${allSlots.length} total slots from API`);
+      debug.log(`[AdminScheduleInterview] Loaded ${allSlots.length} total slots from API`);
 
       // Filter for slots that are:
       // - Active status (required)
@@ -54,11 +55,11 @@ export default function AdminScheduleInterview() {
         return isActive && isFuture;
       });
 
-      console.log(`[AdminScheduleInterview] Filtered to ${available.length} active future slots (including full slots)`);
+      debug.log(`[AdminScheduleInterview] Filtered to ${available.length} active future slots (including full slots)`);
       setAllSlotsCount(allSlots.length);
       setAvailableSlots(available);
     } catch (err) {
-      console.error('Failed to load available slots:', err);
+      debug.error('Failed to load available slots:', err);
       setError('Failed to load available slots');
     }
   };
@@ -121,8 +122,8 @@ export default function AdminScheduleInterview() {
   
   // Debug logging
   if (selectedDate && slotsForSelectedDate.length > 0) {
-    console.log(`[AdminScheduleInterview] Selected date: ${selectedDate}, Found ${slotsForSelectedDate.length} slots`);
-    console.log(`[AdminScheduleInterview] Slots for ${selectedDate}:`, slotsForSelectedDate.map(s => ({
+    debug.log(`[AdminScheduleInterview] Selected date: ${selectedDate}, Found ${slotsForSelectedDate.length} slots`);
+    debug.log(`[AdminScheduleInterview] Slots for ${selectedDate}:`, slotsForSelectedDate.map(s => ({
       time: s.slot_datetime,
       booked: s.current_bookings,
       capacity: s.max_capacity,

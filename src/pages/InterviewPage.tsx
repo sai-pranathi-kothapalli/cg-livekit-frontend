@@ -70,9 +70,8 @@ export default function InterviewPage() {
         // Set booking state FIRST so we can display scheduled time even if there's an error
         setBooking(bookingData);
         
-        // Require application form to be submitted before attending interview.
-        // Block unless explicitly true (treat false, null, undefined as "must complete form").
-        if (bookingData.application_form_submitted !== true) {
+        // Require application form to be submitted before attending interview
+        if (bookingData.application_form_submitted === false) {
           setError('application_form_required');
           setLoading(false);
           return;

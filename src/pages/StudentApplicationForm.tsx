@@ -157,18 +157,19 @@ export default function StudentApplicationForm() {
       if (response.success && response.form) {
         setExistingForm(response.form);
 
-        // Auto-fill form with extracted data
+        // Auto-fill form with extracted data so it shows in Application Details (same as manual)
         setForm(prev => ({
           ...prev,
-          full_name: response.form.full_name,
-          ...response.form as any // Spread extracted fields
+          full_name: response.form.full_name ?? prev.full_name,
+          ...(response.form as any), // Spread all extracted fields
         }));
 
         setSuccess(true);
-        setActiveTab('fill'); // Switch to form view to show extracted data
+        setActiveTab('fill'); // Switch to Fill tab to show extracted data
+        setIsEditing(false);  // Show Application Details view (same as after manual submit)
 
         if (response.extraction_error) {
-          setError(`File uploaded, but auto-fill had issues: ${response.extraction_error}`);
+          setError(`File uploaded, but some fields could not be extracted: ${response.extraction_error}`);
         }
       }
     } catch (err) {

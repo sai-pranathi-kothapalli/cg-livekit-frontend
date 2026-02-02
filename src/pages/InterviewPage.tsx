@@ -70,6 +70,14 @@ export default function InterviewPage() {
         // Set booking state FIRST so we can display scheduled time even if there's an error
         setBooking(bookingData);
         
+        // Require application form to be submitted before attending interview.
+        // Block unless explicitly true (treat false, null, undefined as "must complete form").
+        if (bookingData.application_form_submitted !== true) {
+          setError('application_form_required');
+          setLoading(false);
+          return;
+        }
+        
         // Check if interview window is valid (can only join during the scheduled interview time)
         const scheduledAt = new Date(bookingData.scheduled_at);
         const now = new Date();
@@ -150,6 +158,29 @@ export default function InterviewPage() {
           <p className="text-sm text-muted-foreground">
             Redirecting to login page...
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (error === 'application_form_required') {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="max-w-md space-y-4 text-center">
+          <h1 className="text-2xl font-semibold">Application Form Required</h1>
+          <p className="text-sm text-muted-foreground">
+            You must complete and submit your application form before you can attend the interview.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Go to Application Form in your dashboard, fill it in, and submit. Then return to this link to join the interview.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate(isStudent ? '/student/application-form' : '/login', { state: { redirect: `/interview/${token}` } })}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            {isStudent ? 'Go to Application Form' : 'Log in and go to Application Form'}
+          </button>
         </div>
       </main>
     );

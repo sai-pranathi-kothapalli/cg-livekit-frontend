@@ -104,11 +104,14 @@ export interface BookingResponse {
   slot?: {
     id: string;
     slot_datetime: string;
+    end_time?: string;
     duration_minutes?: number;
     max_capacity?: number;
     current_bookings?: number;
     status?: string;
   } | null;
+  /** Must be true to attend interview; false means user must complete application form first */
+  application_form_submitted?: boolean | null;
 }
 
 /**

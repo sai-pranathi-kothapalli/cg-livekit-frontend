@@ -156,12 +156,56 @@ export default function StudentApplicationForm() {
       const response = await uploadApplicationForm(file);
       if (response.success && response.form) {
         setExistingForm(response.form);
+        const f = response.form as Record<string, unknown>;
 
-        // Auto-fill form with extracted data
+        // Auto-fill every form field from extracted PDF data so the form matches the uploaded application
         setForm(prev => ({
           ...prev,
-          full_name: response.form.full_name,
-          ...response.form as any // Spread extracted fields
+          full_name: (f.full_name as string) ?? prev.full_name,
+          post: (f.post as string) ?? prev.post,
+          category: (f.category as string) ?? prev.category,
+          date_of_birth: (f.date_of_birth as string) ?? prev.date_of_birth,
+          gender: (f.gender as string) ?? prev.gender,
+          marital_status: (f.marital_status as string) ?? prev.marital_status,
+          aadhaar_number: (f.aadhaar_number as string) ?? prev.aadhaar_number,
+          pan_number: (f.pan_number as string) ?? prev.pan_number,
+          father_name: (f.father_name as string) ?? prev.father_name,
+          mother_name: (f.mother_name as string) ?? prev.mother_name,
+          spouse_name: (f.spouse_name as string) ?? prev.spouse_name,
+          correspondence_address1: (f.correspondence_address1 as string) ?? prev.correspondence_address1,
+          correspondence_address2: (f.correspondence_address2 as string) ?? prev.correspondence_address2,
+          correspondence_address3: (f.correspondence_address3 as string) ?? prev.correspondence_address3,
+          correspondence_state: (f.correspondence_state as string) ?? prev.correspondence_state,
+          correspondence_district: (f.correspondence_district as string) ?? prev.correspondence_district,
+          correspondence_pincode: (f.correspondence_pincode as string) ?? prev.correspondence_pincode,
+          permanent_address1: (f.permanent_address1 as string) ?? prev.permanent_address1,
+          permanent_address2: (f.permanent_address2 as string) ?? prev.permanent_address2,
+          permanent_address3: (f.permanent_address3 as string) ?? prev.permanent_address3,
+          permanent_state: (f.permanent_state as string) ?? prev.permanent_state,
+          permanent_district: (f.permanent_district as string) ?? prev.permanent_district,
+          permanent_pincode: (f.permanent_pincode as string) ?? prev.permanent_pincode,
+          ssc_board: (f.ssc_board as string) ?? prev.ssc_board,
+          ssc_passing_date: (f.ssc_passing_date as string) ?? prev.ssc_passing_date,
+          ssc_percentage: (f.ssc_percentage as string) ?? prev.ssc_percentage,
+          ssc_class: (f.ssc_class as string) ?? prev.ssc_class,
+          graduation_degree: (f.graduation_degree as string) ?? prev.graduation_degree,
+          graduation_college: (f.graduation_college as string) ?? prev.graduation_college,
+          graduation_specialization: (f.graduation_specialization as string) ?? prev.graduation_specialization,
+          graduation_passing_date: (f.graduation_passing_date as string) ?? prev.graduation_passing_date,
+          graduation_percentage: (f.graduation_percentage as string) ?? prev.graduation_percentage,
+          graduation_class: (f.graduation_class as string) ?? prev.graduation_class,
+          religion: (f.religion as string) ?? prev.religion,
+          religious_minority: (f.religious_minority as boolean) ?? prev.religious_minority,
+          local_language_studied: (f.local_language_studied as boolean) ?? prev.local_language_studied,
+          local_language_name: (f.local_language_name as string) ?? prev.local_language_name,
+          computer_knowledge: (f.computer_knowledge as boolean) ?? prev.computer_knowledge,
+          computer_knowledge_details: (f.computer_knowledge_details as string) ?? prev.computer_knowledge_details,
+          languages_known: (f.languages_known as typeof prev.languages_known) ?? prev.languages_known,
+          state_applying_for: (f.state_applying_for as string) ?? prev.state_applying_for,
+          regional_rural_bank: (f.regional_rural_bank as string) ?? prev.regional_rural_bank,
+          exam_center_preference1: (f.exam_center_preference1 as string) ?? prev.exam_center_preference1,
+          exam_center_preference2: (f.exam_center_preference2 as string) ?? prev.exam_center_preference2,
+          medium_of_paper: (f.medium_of_paper as string) ?? prev.medium_of_paper,
         }));
 
         setSuccess(true);

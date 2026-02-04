@@ -364,7 +364,8 @@ export const SessionView = ({
     };
   }, [session.isConnected, isInterviewCompleted]);
   
-  // Update timer every second
+  // Update timer every second (display only). Do NOT redirect when local timer hits 0.
+  // Only the server (interview_completed) can end the interview and trigger redirect.
   useEffect(() => {
     if (!interviewStartTime || !interviewDuration) return;
     
@@ -374,47 +375,17 @@ export const SessionView = ({
       const remaining = Math.max(0, interviewDuration - elapsed);
       setTimeRemaining(remaining);
       
-      // If time is up, trigger interview completion
+      // When local timer hits 0: only update display to 00:00. Do NOT redirect or set completed.
+      // The worker is the single source of truth; it will send interview_completed at 90%/100%
+      // and only then we redirect (handled in data channel handler).
       if (remaining <= 0 && !isInterviewCompleted) {
         setTimeRemaining(0);
-        debug.log('⏰ Timer reached 00:00 - triggering interview completion');
-        
-        // Mark as completed
-        setIsInterviewCompleted(true);
-        
-        // Send completion signal via data channel to ensure agent knows
-        // Get room from session if available
-        const currentRoom = session?.room;
-        if (currentRoom && currentRoom.localParticipant) {
-          try {
-            const completionSignal = JSON.stringify({
-              type: 'time_limit_reached',
-              message: 'Interview time has been completed. Please wrap up and redirect to evaluation.',
-              token: interviewToken,
-            });
-            currentRoom.localParticipant.publishData(
-              new TextEncoder().encode(completionSignal),
-              { topic: 'lk-chat', reliable: true }
-            );
-            debug.log('✅ Sent time limit reached signal to agent');
-          } catch (e) {
-            debug.warn('⚠️ Failed to send time limit signal:', e);
-          }
-        }
-        
-        // Redirect to evaluation page after a delay
-        if (interviewToken) {
-          setTimeout(() => {
-            const evaluationUrl = `/evaluation/${interviewToken}`;
-            debug.log('🔄 Redirecting to evaluation page:', evaluationUrl);
-            window.location.href = evaluationUrl;
-          }, 3000); // 3 second delay to allow agent to finish speaking
-        }
+        debug.log('⏰ Timer reached 00:00 (display only). Waiting for server to send interview_completed.');
       }
     }, 1000); // Update every second
     
     return () => clearInterval(interval);
-  }, [interviewStartTime, interviewDuration, isInterviewCompleted, session, interviewToken]);
+  }, [interviewStartTime, interviewDuration, isInterviewCompleted]);
   
   // Format time remaining for display
   const formatTimeRemaining = (minutes: number | null): string => {

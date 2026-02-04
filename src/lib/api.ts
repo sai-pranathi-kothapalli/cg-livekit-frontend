@@ -330,10 +330,7 @@ export async function resetPassword(data: ResetPasswordRequest): Promise<{ succe
 // ==================== Admin API Functions ====================
 
 export interface JobDescription {
-  title: string;
-  description: string;
-  requirements: string;
-  preparation_areas: string[];
+  context: string;  // Full interview/agent context (admin-editable)
 }
 
 export interface AdminLoginRequest {

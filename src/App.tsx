@@ -21,6 +21,7 @@ const AdminEnrollUser = lazy(() => import('./pages/AdminEnrollUser'));
 const AdminManageUsers = lazy(() => import('./pages/AdminManageUsers'));
 const AdminScheduleInterview = lazy(() => import('./pages/AdminScheduleInterview'));
 const AdminManageSlots = lazy(() => import('./pages/AdminManageSlots'));
+const AdminGeminiUsagePage = lazy(() => import('./pages/AdminGeminiUsagePage'));
 const UserApplicationForm = lazy(() => import('./pages/UserApplicationForm'));
 const UserApplicationView = lazy(() => import('./pages/UserApplicationView'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
@@ -91,133 +92,141 @@ function App() {
     >
       <ErrorBoundary>
         <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading...</div>}>
-        <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route
-          path="/change-password"
-          element={
-            <ProtectedRoute>
-              <ChangePassword />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/interview/:token" element={<InterviewPage />} />
-        {/* Admin Routes */}
-        <Route
-          path="/admin/dashboard"
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/jd-editor"
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminJDEditor />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/enroll-user"
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminEnrollUser />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/manage-users"
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminManageUsers />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/slots"
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminManageSlots />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/schedule-interview"
-          element={
-            <ProtectedRoute requireAdmin>
-              <AdminScheduleInterview />
-            </ProtectedRoute>
-          }
-        />
-        {/* Student Routes */}
-        <Route
-          path="/student/dashboard"
-          element={
-            <ProtectedRoute requireStudent>
-              <StudentDashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/student/jobs"
-          element={
-            <ProtectedRoute requireStudent>
-              <JobsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/student/apply"
-          element={
-            <ProtectedRoute requireStudent>
-              <ApplyPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/student/profile"
-          element={
-            <ProtectedRoute requireStudent>
-              <StudentProfile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/student/my-interviews"
-          element={
-            <ProtectedRoute requireStudent>
-              <StudentMyInterviews />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/student/application-form"
-          element={
-            <ProtectedRoute requireStudent>
-              <StudentApplicationForm />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/evaluation/:token"
-          element={
-            <ProtectedRoute>
-              <InterviewEvaluationPage />
-            </ProtectedRoute>
-          }
-        />
-        {/* Legacy routes - redirect to student routes */}
-        <Route path="/jobs" element={<Navigate to="/student/jobs" replace />} />
-        <Route path="/apply" element={<Navigate to="/student/apply" replace />} />
-        {/* Other Routes */}
-        <Route path="/user/application" element={<UserApplicationForm />} />
-        <Route path="/user/application/view" element={<UserApplicationView />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route
+              path="/change-password"
+              element={
+                <ProtectedRoute>
+                  <ChangePassword />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/interview/:token" element={<InterviewPage />} />
+            {/* Admin Routes */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/jd-editor"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminJDEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/enroll-user"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminEnrollUser />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/manage-users"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminManageUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/slots"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminManageSlots />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/schedule-interview"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminScheduleInterview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/gemini-usage"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminGeminiUsagePage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Student Routes */}
+            <Route
+              path="/student/dashboard"
+              element={
+                <ProtectedRoute requireStudent>
+                  <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/jobs"
+              element={
+                <ProtectedRoute requireStudent>
+                  <JobsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/apply"
+              element={
+                <ProtectedRoute requireStudent>
+                  <ApplyPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/profile"
+              element={
+                <ProtectedRoute requireStudent>
+                  <StudentProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/my-interviews"
+              element={
+                <ProtectedRoute requireStudent>
+                  <StudentMyInterviews />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/application-form"
+              element={
+                <ProtectedRoute requireStudent>
+                  <StudentApplicationForm />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/evaluation/:token"
+              element={
+                <ProtectedRoute>
+                  <InterviewEvaluationPage />
+                </ProtectedRoute>
+              }
+            />
+            {/* Legacy routes - redirect to student routes */}
+            <Route path="/jobs" element={<Navigate to="/student/jobs" replace />} />
+            <Route path="/apply" element={<Navigate to="/student/apply" replace />} />
+            {/* Other Routes */}
+            <Route path="/user/application" element={<UserApplicationForm />} />
+            <Route path="/user/application/view" element={<UserApplicationView />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </Suspense>
       </ErrorBoundary>
       <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">

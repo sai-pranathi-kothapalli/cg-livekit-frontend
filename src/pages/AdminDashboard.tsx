@@ -81,8 +81,25 @@ export default function AdminDashboard() {
               Schedule Interview
             </button>
           </div>
+
+          {/* Gemini Usage Card */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 shadow-sm transition hover:shadow-md dark:border-blue-800 dark:bg-blue-950/20">
+            <div className="mb-4">
+              <div className="mb-2 text-2xl">💎</div>
+              <h2 className="text-xl font-semibold">Gemini Usage</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Monitor token usage across all interview sessions. Track input, output, and cumulative costs.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/admin/gemini-usage')}
+              className="mt-4 w-full rounded-md bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-600"
+            >
+              Check Gemini Usage
+            </button>
+          </div>
         </div>
-    </div>
+      </div>
     </AdminLayout>
   );
 }

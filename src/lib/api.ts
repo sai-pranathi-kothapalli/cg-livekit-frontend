@@ -112,6 +112,21 @@ export interface BookingResponse {
   } | null;
   /** Must be true to attend interview; false means user must complete application form first */
   application_form_submitted?: boolean | null;
+  token_usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
+}
+
+export interface PaginatedCandidatesResponse {
+  items: BookingResponse[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
 }
 
 /**
@@ -243,6 +258,11 @@ export interface EvaluationResponse {
   problem_solving?: number;
   /** Overall feedback paragraph from AI */
   overall_feedback?: string;
+  token_usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
 }
 
 /**
@@ -430,8 +450,17 @@ export async function bulkRegisterCandidates(file: File): Promise<BulkRegistrati
 /**
  * Get all candidates
  */
-export async function getAllCandidates(): Promise<BookingResponse[]> {
-  return apiRequest<BookingResponse[]>(`${API_BASE_URL}/api/admin/candidates`, {
+export async function getAllCandidates(): Promise<PaginatedCandidatesResponse> {
+  return apiRequest<PaginatedCandidatesResponse>(`${API_BASE_URL}/api/admin/candidates`, {
+    headers: getAuthHeaders(),
+  });
+}
+
+/**
+ * Get Gemini usage report (non-paginated)
+ */
+export async function getGeminiUsageReport(): Promise<BookingResponse[]> {
+  return apiRequest<BookingResponse[]>(`${API_BASE_URL}/api/admin/gemini-usage`, {
     headers: getAuthHeaders(),
   });
 }

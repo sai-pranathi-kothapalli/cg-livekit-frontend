@@ -486,6 +486,20 @@ export interface UserResponse {
   updated_at: string;
 }
 
+export interface InterviewSummary {
+  token: string;
+  scheduled_at: string;
+  status: string;
+  overall_score?: number;
+  overall_feedback?: string;
+  evaluation_url?: string;
+  interview_url?: string;
+}
+
+export interface UserDetailResponse extends UserResponse {
+  interviews: InterviewSummary[];
+}
+
 export interface UpdateUserRequest {
   name?: string;
   email?: string;
@@ -567,8 +581,8 @@ export async function getAllUsers(): Promise<UserResponse[]> {
 /**
  * Get a user by ID
  */
-export async function getUser(userId: string): Promise<UserResponse> {
-  return apiRequest<UserResponse>(`${API_BASE_URL}/api/admin/users/${userId}`, {
+export async function getUser(userId: string): Promise<UserDetailResponse> {
+  return apiRequest<UserDetailResponse>(`${API_BASE_URL}/api/admin/users/${userId}`, {
     headers: getAuthHeaders(),
   });
 }
@@ -686,6 +700,8 @@ export interface ApplicationFormResponse {
   submitted_at?: string;
   created_at: string;
   updated_at: string;
+  application_file_url?: string;
+  extracted_json_url?: string;
 }
 
 export interface ApplicationFormSubmitRequest {

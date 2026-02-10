@@ -208,6 +208,11 @@ export default function StudentApplicationForm() {
           medium_of_paper: (f.medium_of_paper as string) ?? prev.medium_of_paper,
         }));
 
+        if (response.form.status === 'submitted') {
+          setIsEditing(false); // Switch to view mode if backend submitted it
+          setSuccess(true);
+        }
+
         setSuccess(true);
         setActiveTab('fill'); // Switch to form view to show extracted data
 
@@ -258,7 +263,30 @@ export default function StudentApplicationForm() {
 
         {success && (
           <div className="rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-            ✅ {activeTab === 'upload' ? 'Form uploaded and processed!' : 'Application form submitted successfully!'}
+            <div className="flex flex-col space-y-2">
+              <div className="flex items-center justify-between">
+                <span>✅ {activeTab === 'upload' ? 'Form uploaded and processed!' : 'Application form submitted successfully!'}</span>
+                <button
+                  onClick={() => navigate('/student/my-interviews')}
+                  className="ml-4 font-semibold underline hover:text-green-700 bg-transparent border-none p-0 cursor-pointer"
+                >
+                  Go to My Interviews →
+                </button>
+              </div>
+              {existingForm?.extracted_json_url && (
+                <div className="mt-1 border-t border-green-200 pt-2 flex items-center gap-2">
+                  <span className="text-xs">Extracted data saved as:</span>
+                  <a
+                    href={existingForm.extracted_json_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-semibold underline hover:text-green-900"
+                  >
+                    application_data.json
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -344,8 +372,19 @@ export default function StudentApplicationForm() {
               </div>
             </div>
 
-            <div className="bg-muted/50 p-4 rounded-md text-sm text-muted-foreground">
+            <div className="bg-muted/50 p-4 rounded-md text-sm text-muted-foreground flex items-center justify-between">
               <p>Note: This is a summary view. Click 'Edit Application' to view all fields and make changes.</p>
+              {existingForm?.extracted_json_url && (
+                <a
+                  href={existingForm.extracted_json_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs font-medium text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                  Download JSON
+                </a>
+              )}
             </div>
           </div>
         )}

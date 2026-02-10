@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllUsers, deleteUser, updateUser, type UserResponse, type UpdateUserRequest } from '@/lib/api';
+import { getAllUsers, getUser, deleteUser, updateUser, type UserResponse, type UserDetailResponse, type UpdateUserRequest } from '@/lib/api';
 import AdminLayout from '@/components/AdminLayout';
 
 export default function AdminManageUsers() {
@@ -10,6 +10,26 @@ export default function AdminManageUsers() {
   const [editingUser, setEditingUser] = useState<UserResponse | null>(null);
   const [editForm, setEditForm] = useState<UpdateUserRequest>({});
   const [saving, setSaving] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserDetailResponse | null>(null);
+  const [viewingUser, setViewingUser] = useState(false);
+
+  const handleViewUser = async (user: UserResponse) => {
+    try {
+      setLoading(true);
+      const userDetails = await getUser(user.id);
+      setSelectedUser(userDetails);
+      setViewingUser(true);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const closeUserModal = () => {
+    setViewingUser(false);
+    setSelectedUser(null);
+  };
 
   useEffect(() => {
     loadUsers();
@@ -103,7 +123,7 @@ export default function AdminManageUsers() {
     }
   };
 
-  if (loading) {
+  if (loading && !viewingUser) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center py-12">
@@ -119,6 +139,125 @@ export default function AdminManageUsers() {
         {error && (
           <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
             {error}
+          </div>
+        )}
+
+        {/* User Details Modal */}
+        {viewingUser && selectedUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+            <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-lg border bg-background shadow-lg">
+              <div className="flex items-center justify-between border-b px-6 py-4">
+                <h2 className="text-lg font-semibold">User Details: {selectedUser.name}</h2>
+                <button
+                  onClick={closeUserModal}
+                  className="rounded-full p-1 text-muted-foreground hover:bg-muted"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Personal Info */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Contact Information</h3>
+                    <div className="mt-2 space-y-2 text-sm">
+                      <p><span className="font-semibold">Email:</span> {selectedUser.email}</p>
+                      <p><span className="font-semibold">Phone:</span> {selectedUser.phone || '-'}</p>
+                      <p><span className="font-semibold">Status:</span>
+                        <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getStatusColor(selectedUser.status)}`}>
+                          {selectedUser.status}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground">Metadata</h3>
+                    <div className="mt-2 space-y-2 text-sm">
+                      <p><span className="font-semibold">User ID:</span> <span className="font-mono text-xs">{selectedUser.id}</span></p>
+                      <p><span className="font-semibold">Created:</span> {formatDate(selectedUser.created_at)}</p>
+                      <p><span className="font-semibold">Notes:</span> {selectedUser.notes || '-'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Interview History */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4">Interview History</h3>
+
+                  {selectedUser.interviews && selectedUser.interviews.length > 0 ? (
+                    <div className="rounded-md border">
+                      <table className="w-full text-sm">
+                        <thead className="border-b bg-muted/50">
+                          <tr>
+                            <th className="px-4 py-3 text-left font-medium">Date & Time</th>
+                            <th className="px-4 py-3 text-left font-medium">Status</th>
+                            <th className="px-4 py-3 text-left font-medium">Score</th>
+                            <th className="px-4 py-3 text-left font-medium">Summary</th>
+                            <th className="px-4 py-3 text-right font-medium">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedUser.interviews.map((interview) => (
+                            <tr key={interview.token} className="border-b last:border-0 hover:bg-muted/30">
+                              <td className="px-4 py-3">{formatDate(interview.scheduled_at)}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium 
+                                  ${interview.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                                    interview.status === 'scheduled' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                                      'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'}`}>
+                                  {interview.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 font-medium">
+                                {interview.overall_score ? `${interview.overall_score.toFixed(1)}/10` : '-'}
+                              </td>
+                              <td className="px-4 py-3 max-w-xs truncate text-muted-foreground">
+                                {interview.overall_feedback || '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {interview.evaluation_url && (
+                                  <a
+                                    href={interview.evaluation_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-primary hover:underline font-medium"
+                                  >
+                                    View Report
+                                  </a>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground">
+                      No interviews found for this user.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t bg-muted/30 px-6 py-4">
+                <button
+                  onClick={() => {
+                    closeUserModal();
+                    handleEdit(selectedUser);
+                  }}
+                  className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500"
+                >
+                  Edit User
+                </button>
+                <button
+                  onClick={closeUserModal}
+                  className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition hover:bg-muted"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -229,7 +368,14 @@ export default function AdminManageUsers() {
                         </>
                       ) : (
                         <>
-                          <td className="px-6 py-4 text-sm">{user.name}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <button
+                              onClick={() => handleViewUser(user)}
+                              className="font-medium text-blue-600 hover:underline text-left"
+                            >
+                              {user.name}
+                            </button>
+                          </td>
                           <td className="px-6 py-4 text-sm">{user.email}</td>
                           <td className="px-6 py-4 text-sm">{user.phone || '-'}</td>
                           <td className="px-6 py-4">

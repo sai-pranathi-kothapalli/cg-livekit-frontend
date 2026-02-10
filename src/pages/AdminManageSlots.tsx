@@ -1,10 +1,36 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
-import { getSlots, createSlot, updateSlot, createDaySlots, type SlotResponse, type UpdateSlotRequest } from '@/lib/api';
+import { getSlots, createSlot, updateSlot, deleteSlot, createDaySlots, type SlotResponse, type UpdateSlotRequest } from '@/lib/api';
 import { debug } from '@/lib/debug';
 
 export default function AdminManageSlots() {
   const [slots, setSlots] = useState<SlotResponse[]>([]);
+  // ... (existing state) ...
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+
+  // ... (existing functions) ...
+
+  const handleDelete = async (slotId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!window.confirm('Are you sure you want to delete this slot? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsDeleting(slotId);
+      setError(null);
+      await deleteSlot(slotId);
+      await loadSlots();
+    } catch (err) {
+      setError((err as Error).message || 'Failed to delete slot');
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
+  // ... (formatDate function fix below) ...
+
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -15,7 +41,7 @@ export default function AdminManageSlots() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [creatingDay, setCreatingDay] = useState(false);
   const [creating, setCreating] = useState(false);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     slot_datetime: '',
@@ -99,7 +125,7 @@ export default function AdminManageSlots() {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSlot) return;
-    
+
     try {
       setError(null);
       const updateData: UpdateSlotRequest = {
@@ -133,11 +159,11 @@ export default function AdminManageSlots() {
         max_capacity: 30,
         notes: '',
       });
-      
+
       if (result.errors && result.errors.length > 0) {
         setError(`Created ${result.created_count} slots, but ${result.errors.length} failed: ${result.errors.join(', ')}`);
       }
-      
+
       await loadSlots();
     } catch (err) {
       setError((err as Error).message || 'Failed to create day slots');
@@ -175,13 +201,16 @@ export default function AdminManageSlots() {
     }
   };
 
+  // ... (existing code) ...
+
   const formatDate = (isoString: string) => {
     // Extract date directly from ISO string to avoid timezone conversion
     // Format: "2026-01-13T09:00:00+00:00" -> "Jan 13, 2026"
     const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
     if (match) {
       const [, year, month, day] = match;
-      const date = new Date(year, month - 1, day);
+      // parse strings to numbers
+      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       return date.toLocaleDateString('en-IN', {
         year: 'numeric',
         month: 'short',
@@ -198,6 +227,8 @@ export default function AdminManageSlots() {
   };
 
   const formatDateKey = (isoString: string) => {
+    // ... (existing code) ...
+
     // Extract date directly from ISO string to avoid timezone conversion
     // Format: "2026-01-13T09:00:00+00:00" -> "01/13/2026"
     const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -232,7 +263,7 @@ export default function AdminManageSlots() {
 
   // Sort slots within each date by time
   Object.keys(groupedSlotsByDate).forEach(dateKey => {
-    groupedSlotsByDate[dateKey].sort((a, b) => 
+    groupedSlotsByDate[dateKey].sort((a, b) =>
       new Date(a.slot_datetime).getTime() - new Date(b.slot_datetime).getTime()
     );
   });
@@ -351,35 +382,51 @@ export default function AdminManageSlots() {
                           {dateGroup.slots.length} time slot{dateGroup.slots.length !== 1 ? 's' : ''}
                         </div>
                       </div>
-                      
+
                       {/* Time Slot Pills */}
                       <div className="flex flex-wrap gap-2">
                         {dateGroup.slots.map((slot) => {
                           const isFull = slot.current_bookings >= slot.max_capacity;
-                          
+
                           return (
-                            <button
-                              key={slot.id}
-                              onClick={() => handleSlotClick(slot)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:scale-105 ${
-                                isFull
+                            <div key={slot.id} className="relative group">
+                              <button
+                                onClick={() => handleSlotClick(slot)}
+                                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer transition-all hover:scale-105 pr-8 ${isFull
                                   ? 'bg-red-100 text-red-700 border border-red-300 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700'
                                   : slot.status === 'active'
-                                  ? 'bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
-                                  : 'bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
-                              }`}
-                            >
-                              <span>{formatTime(slot.slot_datetime)}</span>
-                              <span className="text-[10px] opacity-75">
-                                ({slot.current_bookings}/{slot.max_capacity})
-                              </span>
-                            </button>
+                                    ? 'bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700'
+                                    : 'bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                                  }`}
+                              >
+                                <span>{formatTime(slot.slot_datetime)}</span>
+                                <span className="text-[10px] opacity-75">
+                                  ({slot.current_bookings}/{slot.max_capacity})
+                                </span>
+                              </button>
+                              <button
+                                onClick={(e) => handleDelete(slot.id, e)}
+                                disabled={isDeleting === slot.id}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                                title="Delete Slot"
+                              >
+                                {isDeleting === slot.id ? (
+                                  <span className="w-3 h-3 block border-2 border-red-600 border-t-transparent rounded-full animate-spin"></span>
+                                ) : (
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M3 6h18"></path>
+                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                           );
                         })}
                       </div>
                     </div>
                   ))}
-                  
+
                   {/* Fill empty cards if less than 4 dates in this row */}
                   {dateRow.length < 4 && Array.from({ length: 4 - dateRow.length }).map((_, emptyIndex) => (
                     <div key={`empty-${emptyIndex}`} className="hidden lg:block" />
@@ -398,7 +445,7 @@ export default function AdminManageSlots() {
             <h2 className="text-2xl font-bold text-foreground mb-4">
               {editingSlot ? 'Edit Slot' : 'Create New Slot'}
             </h2>
-            
+
             <form onSubmit={editingSlot ? handleUpdate : handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -495,7 +542,7 @@ export default function AdminManageSlots() {
             <p className="text-sm text-muted-foreground mb-4">
               Create multiple slots for a single day with a specified time range and interval.
             </p>
-            
+
             <form onSubmit={handleCreateDaySlots} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-2">
@@ -687,8 +734,8 @@ export default function AdminManageSlots() {
               {slotBookings.length === 0 ? (
                 <div className="text-center py-8 bg-muted rounded-lg">
                   <p className="text-muted-foreground">
-                    {showSlotDetails.current_bookings === 0 
-                      ? 'No bookings for this slot yet' 
+                    {showSlotDetails.current_bookings === 0
+                      ? 'No bookings for this slot yet'
                       : 'Booking details will be shown here'}
                   </p>
                 </div>

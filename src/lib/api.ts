@@ -638,6 +638,9 @@ export interface UpdateSlotRequest {
   notes?: string;
 }
 
+
+
+
 /**
  * Get all interview slots (admin only)
  */

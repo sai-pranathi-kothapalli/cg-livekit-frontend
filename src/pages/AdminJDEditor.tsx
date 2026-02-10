@@ -78,6 +78,27 @@ export default function AdminJDEditor() {
             <p className="mb-2 text-xs text-muted-foreground">
               This context is sent to the interview agent. Edit it here to change how the interviewer behaves, what questions to ask, and any rules. The agent uses this as its main instructions.
             </p>
+            <div className="mb-4 rounded-md bg-muted p-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Available Context Keys:</span>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {[
+                  'full_name',  'post', 'category', 'date_of_birth',
+                  'gender', 'marital_status', 'aadhaar_number', 'pan_number',
+                  'father_name', 'mother_name', 'spouse_name', 'correspondence_address1',
+                  'correspondence_state', 'correspondence_district', 'permanent_address1',
+                  'permanent_state', 'permanent_district', 'ssc_percentage',
+                  'graduation_degree', 'graduation_college', 'graduation_specialization',
+                  'graduation_percentage'
+                ].map(key => (
+                  <code key={key} className="rounded bg-background px-1 py-0.5 border border-border">
+                    {`{${key}}`}
+                  </code>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                Use these placeholders in the text below (e.g. "Hello {'{name}'}"). They will be replaced with actual candidate data.
+              </p>
+            </div>
             <textarea
               value={jd.context}
               onChange={(e) => setJd({ ...jd, context: e.target.value })}

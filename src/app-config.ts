@@ -20,19 +20,20 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Sreedhar CCE',
-  pageTitle: 'Sreedhar CCE - Interview Platform',
-  pageDescription: 'Interview platform by Sreedhar CCE - Results Super Star',
+  companyName: 'Codegnan',
+  pageTitle: 'Codegnan - AI Interview Platform',
+  pageDescription: 'Codegnan AI Interview Platform - AI-powered mock interviews for technical, HR, and placement preparation.',
 
   supportsChatInput: true,
   supportsVideoInput: true, // Re-enabled video for avatar support
   supportsScreenShare: true,
   isPreConnectBufferEnabled: true,
 
+  // Logo served from public root; replace this file with the Codegnan logo image
   logo: '/sreedhar-logo.png',
-  accent: '#002cf2',
+  accent: '#2563eb',
   logoDark: '/sreedhar-logo.png',
-  accentDark: '#1fd5f9',
+  accentDark: '#4f46e5',
   startButtonText: 'Start Interview',
 
   // for LiveKit Cloud Sandbox

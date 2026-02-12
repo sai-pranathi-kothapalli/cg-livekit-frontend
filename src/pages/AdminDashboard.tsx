@@ -31,6 +31,23 @@ export default function AdminDashboard() {
             </button>
           </div>
 
+          {/* Manage Managers Card */}
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm transition hover:shadow-md">
+            <div className="mb-4">
+              <div className="mb-2 text-2xl">👔</div>
+              <h2 className="text-xl font-semibold">Manage Managers</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Enroll and manage interviewer/manager accounts for your interview platform.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/admin/manage-managers')}
+              className="mt-4 w-full rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-500"
+            >
+              Manage Managers
+            </button>
+          </div>
+
           {/* Enroll User Card */}
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm transition hover:shadow-md">
             <div className="mb-4">

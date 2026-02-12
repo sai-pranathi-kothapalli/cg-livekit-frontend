@@ -10,15 +10,17 @@ import { useAuth } from '@/contexts/AuthContext';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean;
+  requireManager?: boolean;
   requireStudent?: boolean;
 }
 
 export function ProtectedRoute({
   children,
   requireAdmin = false,
+  requireManager = false,
   requireStudent = false,
 }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, isAdmin, isStudent } = useAuth();
+  const { isAuthenticated, isLoading, isAdmin, isManager, isStudent } = useAuth();
 
   if (isLoading) {
     return (
@@ -33,11 +35,15 @@ export function ProtectedRoute({
   }
 
   if (requireAdmin && !isAdmin) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
+  }
+
+  if (requireManager && !isManager) {
+    return <Navigate to="/" replace />;
   }
 
   if (requireStudent && !isStudent) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

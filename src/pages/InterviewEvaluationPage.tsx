@@ -178,13 +178,28 @@ export default function InterviewEvaluationPage() {
             </div>
           </div>
 
+          {/* Processing State if score is missing */}
+          {evaluationData.overall_score == null && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 shadow-sm dark:border-blue-800 dark:bg-blue-950">
+              <div className="flex items-center gap-4">
+                <div className="animate-spin text-2xl">⏳</div>
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">AI Analysis in Progress</h3>
+                  <p className="text-sm text-blue-800 dark:text-blue-300">
+                    We're still calculating your detailed scores and feedback. This page will update automatically once the analysis is complete.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Overall Score Card */}
           {evaluationData.overall_score != null && (
-            <div className={`rounded - lg border border - border p - 6 shadow - sm ${getScoreBgColor(evaluationData.overall_score)} `}>
+            <div className={`rounded-lg border border-border p-6 shadow-sm ${getScoreBgColor(evaluationData.overall_score)}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Overall Performance Score</div>
-                  <div className={`mt - 2 text - 4xl font - bold ${getScoreColor(evaluationData.overall_score)} `}>
+                  <div className={`mt-2 text-4xl font-bold ${getScoreColor(evaluationData.overall_score)}`}>
                     {evaluationData.overall_score.toFixed(1)} / 10
                   </div>
                 </div>
@@ -209,7 +224,7 @@ export default function InterviewEvaluationPage() {
                 {evaluationData.communication_quality != null && (
                   <div className="rounded-lg border border-border bg-muted/50 p-4">
                     <div className="text-sm font-medium text-muted-foreground">Communication Quality</div>
-                    <div className={`mt - 2 text - 2xl font - bold ${getScoreColor(evaluationData.communication_quality)} `}>
+                    <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.communication_quality)}`}>
                       {evaluationData.communication_quality.toFixed(1)} / 10
                     </div>
                   </div>
@@ -217,7 +232,7 @@ export default function InterviewEvaluationPage() {
                 {evaluationData.technical_knowledge != null && (
                   <div className="rounded-lg border border-border bg-muted/50 p-4">
                     <div className="text-sm font-medium text-muted-foreground">Technical Knowledge</div>
-                    <div className={`mt - 2 text - 2xl font - bold ${getScoreColor(evaluationData.technical_knowledge)} `}>
+                    <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.technical_knowledge)}`}>
                       {evaluationData.technical_knowledge.toFixed(1)} / 10
                     </div>
                   </div>
@@ -225,7 +240,7 @@ export default function InterviewEvaluationPage() {
                 {evaluationData.problem_solving != null && (
                   <div className="rounded-lg border border-border bg-muted/50 p-4">
                     <div className="text-sm font-medium text-muted-foreground">Problem Solving</div>
-                    <div className={`mt - 2 text - 2xl font - bold ${getScoreColor(evaluationData.problem_solving)} `}>
+                    <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.problem_solving)}`}>
                       {evaluationData.problem_solving.toFixed(1)} / 10
                     </div>
                   </div>
@@ -235,12 +250,12 @@ export default function InterviewEvaluationPage() {
           )}
 
           {/* Overall Feedback (AI summary paragraph) */}
-          {evaluationData.overall_feedback && (
-            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-3 text-xl font-semibold">Overall Feedback</h2>
-              <p className="text-muted-foreground whitespace-pre-wrap">{evaluationData.overall_feedback}</p>
-            </div>
-          )}
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-3 text-xl font-semibold">Overall Feedback</h2>
+            <p className="text-foreground leading-relaxed whitespace-pre-wrap italic">
+              {evaluationData.overall_feedback || "No feedback available yet."}
+            </p>
+          </div>
 
           {/* Tabs */}
           <div className="border-b border-border">
@@ -254,10 +269,10 @@ export default function InterviewEvaluationPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items - center gap - 2 border - b - 2 px - 1 py - 4 text - sm font - medium transition - colors ${activeTab === tab.id
+                  className={`flex items-center gap-2 border-b-2 px-1 py-4 text-sm font-medium transition-colors ${activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
                     : 'border-transparent text-muted-foreground hover:border-gray-300 hover:text-foreground'
-                    } `}
+                    }`}
                 >
                   <span>{tab.icon}</span>
                   <span>{tab.label}</span>
@@ -385,9 +400,9 @@ export default function InterviewEvaluationPage() {
                           </div>
                         </div>
                         {round.average_rating && (
-                          <div className={`rounded - lg px - 4 py - 2 ${getScoreBgColor(round.average_rating)} `}>
+                          <div className={`rounded-lg px-4 py-2 ${getScoreBgColor(round.average_rating)}`}>
                             <div className="text-xs text-muted-foreground">Average Rating</div>
-                            <div className={`text - 2xl font - bold ${getScoreColor(round.average_rating)} `}>
+                            <div className={`text-2xl font-bold ${getScoreColor(round.average_rating)}`}>
                               {round.average_rating.toFixed(1)}
                             </div>
                           </div>

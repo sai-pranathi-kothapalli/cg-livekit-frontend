@@ -1,10 +1,15 @@
 import { useState } from 'react';
 import { enrollUser, bulkEnrollUsers, type EnrollUserRequest, type BulkEnrollResponse } from '@/lib/api';
 import AdminLayout from '@/components/AdminLayout';
+import ManagerLayout from '@/components/ManagerLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import * as XLSX from 'xlsx';
 
 export default function AdminEnrollUser() {
+  const { isManager } = useAuth();
+  const Layout = isManager ? ManagerLayout : AdminLayout;
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
+  // ... (rest of state)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -19,8 +24,6 @@ export default function AdminEnrollUser() {
     notes: '',
     slot_ids: [],
   });
-
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +57,6 @@ export default function AdminEnrollUser() {
       setLoading(false);
     }
   };
-
-
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -126,7 +127,7 @@ export default function AdminEnrollUser() {
   };
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Tabs */}
         <div className="border-b border-border">
@@ -328,6 +329,6 @@ export default function AdminEnrollUser() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }

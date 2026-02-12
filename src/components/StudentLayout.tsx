@@ -15,7 +15,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/student/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/student/my-interviews', label: 'My Interviews', icon: '📅' },
-  { path: '/student/application-form', label: 'Application Form', icon: '📄' },
+  { path: '/student/overall-analysis', label: 'Overall Analysis', icon: '📈' },
+  { path: '/student/application-form', label: 'Resume', icon: '📄' },
 ];
 
 export default function StudentLayout({ children }: StudentLayoutProps) {
@@ -46,16 +47,16 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
             <Link to="/student/dashboard" className="flex items-center gap-2">
               <img
                 src="/sreedhar-logo.png"
-                alt="Sreedhar CCE Logo"
+                alt="Codegnan Logo"
                 className="h-8 w-auto object-contain"
               />
-              <h1 className="text-lg font-bold">Student Portal</h1>
+              <h1 className="text-lg font-bold">Codegnan Student Portal</h1>
             </Link>
           )}
           {!sidebarOpen && (
             <img
               src="/sreedhar-logo.png"
-              alt="Sreedhar CCE Logo"
+              alt="Codegnan Logo"
               className="h-8 w-auto object-contain mx-auto"
             />
           )}
@@ -76,8 +77,8 @@ export default function StudentLayout({ children }: StudentLayoutProps) {
                 <button
                   onClick={() => navigate(item.path)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive(item.path)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted text-foreground'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted text-foreground'
                     }`}
                 >
                   <span className="text-xl">{item.icon}</span>

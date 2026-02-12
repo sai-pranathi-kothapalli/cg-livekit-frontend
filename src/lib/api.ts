@@ -285,14 +285,14 @@ export interface LoginResponse {
   success: boolean;
   token?: string;
   error?: string;
-  role?: 'admin' | 'student';
+  role?: 'admin' | 'manager' | 'student';
   user?: {
     id: string;
     email?: string;
     name?: string;
     username?: string;
     phone?: string;
-    role: 'admin' | 'student';
+    role: 'admin' | 'manager' | 'student';
   };
   must_change_password?: boolean;
 }
@@ -498,6 +498,8 @@ export interface InterviewSummary {
 
 export interface UserDetailResponse extends UserResponse {
   interviews: InterviewSummary[];
+  /** Aggregated progress/feedback summary across interviews (when available) */
+  overall_analysis?: string | null;
 }
 
 export interface UpdateUserRequest {
@@ -527,7 +529,8 @@ export interface AssignmentResponse {
 }
 
 export interface SelectSlotRequest {
-  assignment_id: string;
+  slot_id: string;
+  prompt?: string;
 }
 
 export interface MyInterviewResponse {
@@ -896,6 +899,7 @@ export async function bulkEnrollUsers(file: File): Promise<BulkEnrollResponse> {
 export interface ScheduleInterviewForUserRequest {
   user_id: string;
   slot_id: string;  // ID of the interview slot to book
+  prompt?: string;  // Optional custom prompt for the interview agent
 }
 
 export interface BulkScheduleInterviewResponse {
@@ -1028,4 +1032,84 @@ export async function getApplicationByToken(token: string): Promise<RRBApplicati
     }
     throw error;
   }
+}
+/**
+ * Get all managers
+ */
+export async function getManagers(): Promise<UserResponse[]> {
+  return apiRequest<UserResponse[]>(`${API_BASE_URL}/api/admin/managers`, {
+    headers: getAuthHeaders(),
+  });
+}
+
+/**
+ * Enroll a new manager
+ */
+export async function enrollManager(name: string, email: string): Promise<{ id: string; temp_password: string }> {
+  return apiRequest<{ id: string; temp_password: string }>(`${API_BASE_URL}/api/admin/managers`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ name, email }),
+  });
+}
+
+/**
+ * Delete a manager
+ */
+export async function deleteManager(managerId: string): Promise<void> {
+  return apiRequest<void>(`${API_BASE_URL}/api/admin/managers/${managerId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+}
+
+/**
+ * Get system instructions
+ */
+export async function getSystemInstructions(): Promise<{ instructions: string }> {
+  return apiRequest<{ instructions: string }>(`${API_BASE_URL}/api/admin/system-instructions`, {
+    headers: getAuthHeaders(),
+  });
+}
+
+/**
+ * Update system instructions
+ */
+export async function updateSystemInstructions(instructions: string): Promise<void> {
+  return apiRequest<void>(`${API_BASE_URL}/api/admin/system-instructions`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ instructions }),
+  });
+}
+
+// ==================== Student Analytics API Functions ====================
+
+export interface StudentAnalyticsResponse {
+  total_interviews: number;
+  average_scores: {
+    overall: number;
+    communication: number;
+    technical: number;
+    problem_solving: number;
+  };
+  history: Array<{
+    date: string;
+    score: number;
+    communication: number;
+    technical: number;
+    problem_solving: number;
+  }>;
+  recent_strengths: string[];
+  recent_improvements: string[];
+  overall_analysis?: string | null;
+}
+
+/**
+ * Get student analytics
+ */
+export async function getStudentAnalytics(): Promise<StudentAnalyticsResponse> {
+  return apiRequest<StudentAnalyticsResponse>(`${API_BASE_URL}/api/student/analytics`, {
+    headers: getAuthHeaders(),
+  });
 }

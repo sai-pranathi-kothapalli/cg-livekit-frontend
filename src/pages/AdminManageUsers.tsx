@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
 import { getAllUsers, getUser, deleteUser, updateUser, type UserResponse, type UserDetailResponse, type UpdateUserRequest } from '@/lib/api';
 import AdminLayout from '@/components/AdminLayout';
+import ManagerLayout from '@/components/ManagerLayout';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AdminManageUsers() {
+  const { isManager } = useAuth();
+  const Layout = isManager ? ManagerLayout : AdminLayout;
   const [users, setUsers] = useState<UserResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +121,7 @@ export default function AdminManageUsers() {
       case 'selected':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'rejected':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+        return 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
@@ -125,16 +129,16 @@ export default function AdminManageUsers() {
 
   if (loading && !viewingUser) {
     return (
-      <AdminLayout>
+      <Layout>
         <div className="flex items-center justify-center py-12">
           <p className="text-muted-foreground">Loading users...</p>
         </div>
-      </AdminLayout>
+      </Layout>
     );
   }
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {error && (
           <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
@@ -184,6 +188,18 @@ export default function AdminManageUsers() {
                 {/* Interview History */}
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Interview History</h3>
+
+                  {/* Overall Feedback (Aggregated) */}
+                  <div className="mb-4 rounded-md border bg-muted/20 p-4">
+                    <div className="text-sm font-medium text-muted-foreground">Overall Feedback</div>
+                    <div className="mt-2 text-sm leading-relaxed">
+                      {selectedUser.overall_analysis ? (
+                        <p className="text-foreground whitespace-pre-wrap">{selectedUser.overall_analysis}</p>
+                      ) : (
+                        <p className="text-muted-foreground">No overall feedback available yet.</p>
+                      )}
+                    </div>
+                  </div>
 
                   {selectedUser.interviews && selectedUser.interviews.length > 0 ? (
                     <div className="rounded-md border">
@@ -238,6 +254,37 @@ export default function AdminManageUsers() {
                     </div>
                   )}
                 </div>
+
+                {/* Overall Analysis Section */}
+                {selectedUser.interviews && selectedUser.interviews.filter(i => i.overall_score !== null).length >= 2 && (
+                  <div className="mt-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <span>📊</span> Overall Progress Analysis
+                    </h3>
+                    <div className="bg-primary/5 p-6 rounded-2xl border border-primary/10">
+                      <div className="flex items-start gap-4">
+                        <div className="text-3xl text-primary/40 pt-1">"</div>
+                        <div className="flex-1">
+                          <p className="text-foreground leading-relaxed text-base">
+                            This student has completed {selectedUser.interviews.filter(i => i.overall_score !== null).length} interviews with evaluations.
+                            {selectedUser.interviews.filter(i => i.overall_score !== null).length >= 2 ? (
+                              <span>
+                                {' '}Average score: <span className="font-semibold">
+                                  {(selectedUser.interviews
+                                    .filter(i => i.overall_score !== null)
+                                    .reduce((sum, i) => sum + (i.overall_score || 0), 0) /
+                                    selectedUser.interviews.filter(i => i.overall_score !== null).length
+                                  ).toFixed(1)}/10
+                                </span>.
+                                View the Individual Interview panel to see detailed AI-powered insights for each interview.
+                              </span>
+                            ) : null}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end gap-3 border-t bg-muted/30 px-6 py-4">
@@ -415,7 +462,7 @@ export default function AdminManageUsers() {
           </div>
         </div>
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }
 

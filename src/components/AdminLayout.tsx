@@ -14,7 +14,8 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-  { path: '/admin/jd-editor', label: 'Job Description', icon: '📝' },
+  { path: '/admin/system-instructions', label: 'System Instructions', icon: '📝' },
+  { path: '/admin/manage-managers', label: 'Manage Managers', icon: '👔' },
   { path: '/admin/enroll-user', label: 'Enroll User', icon: '👤' },
   { path: '/admin/manage-users', label: 'Manage Users', icon: '📋' },
   { path: '/admin/slots', label: 'Interview Slots', icon: '⏰' },
@@ -50,16 +51,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             <div className="flex items-center gap-2">
               <img
                 src="/sreedhar-logo.png"
-                alt="Sreedhar CCE Logo"
+                alt="Codegnan Logo"
                 className="h-8 w-auto object-contain"
               />
-              <h1 className="text-lg font-bold">Admin Panel</h1>
+              <h1 className="text-lg font-bold">Codegnan Admin Panel</h1>
             </div>
           )}
           {!sidebarOpen && (
             <img
               src="/sreedhar-logo.png"
-              alt="Sreedhar CCE Logo"
+              alt="Codegnan Logo"
               className="h-8 w-auto object-contain mx-auto"
             />
           )}
@@ -80,8 +81,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 <button
                   onClick={() => navigate(item.path)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive(item.path)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted text-foreground'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-muted text-foreground'
                     }`}
                 >
                   <span className="text-xl">{item.icon}</span>

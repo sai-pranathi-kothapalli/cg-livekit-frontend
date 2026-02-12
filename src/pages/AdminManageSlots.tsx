@@ -1,9 +1,13 @@
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
+import ManagerLayout from '@/components/ManagerLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import { getSlots, createSlot, updateSlot, deleteSlot, createDaySlots, type SlotResponse, type UpdateSlotRequest } from '@/lib/api';
 import { debug } from '@/lib/debug';
 
 export default function AdminManageSlots() {
+  const { isManager } = useAuth();
+  const Layout = isManager ? ManagerLayout : AdminLayout;
   const [slots, setSlots] = useState<SlotResponse[]>([]);
   // ... (existing state) ...
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -173,23 +177,12 @@ export default function AdminManageSlots() {
   };
 
 
-  // Format time in IST timezone (extract from ISO string to avoid browser timezone conversion)
+  // Format time in IST timezone
   const formatTime = (isoString: string): string => {
     try {
-      // Parse the ISO string and extract time directly to avoid timezone conversion
-      // Backend returns times in IST (e.g., "2026-01-13T09:00:00+05:30")
-      const match = isoString.match(/T(\d{2}):(\d{2}):?(\d{2})?/);
-      if (match) {
-        const [, hourStr, minuteStr] = match;
-        const hours = parseInt(hourStr, 10);
-        const minutes = parseInt(minuteStr, 10);
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        const displayHours = hours % 12 || 12;
-        const displayMinutes = String(minutes).padStart(2, '0');
-        return `${displayHours}:${displayMinutes} ${ampm} IST`;
-      }
-      // Fallback: use Date but specify IST timezone
       const date = new Date(isoString);
+      if (isNaN(date.getTime())) return isoString;
+
       return date.toLocaleTimeString('en-IN', {
         timeZone: 'Asia/Kolkata',
         hour: '2-digit',
@@ -201,48 +194,44 @@ export default function AdminManageSlots() {
     }
   };
 
-  // ... (existing code) ...
-
   const formatDate = (isoString: string) => {
-    // Extract date directly from ISO string to avoid timezone conversion
-    // Format: "2026-01-13T09:00:00+00:00" -> "Jan 13, 2026"
-    const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const [, year, month, day] = match;
-      // parse strings to numbers
-      const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return isoString;
+
       return date.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
         year: 'numeric',
         month: 'short',
         day: 'numeric',
       });
+    } catch (e) {
+      return isoString;
     }
-    // Fallback to Date conversion if format doesn't match
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   const formatDateKey = (isoString: string) => {
-    // ... (existing code) ...
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return isoString;
 
-    // Extract date directly from ISO string to avoid timezone conversion
-    // Format: "2026-01-13T09:00:00+00:00" -> "01/13/2026"
-    const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const [, year, month, day] = match;
-      return `${year}-${month}-${day}`;
+      // Format as YYYY-MM-DD in IST
+      // Use en-CA (Canada) as it defaults to YYYY-MM-DD, then force IST timezone
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(date);
+
+      const y = parts.find(p => p.type === 'year')?.value;
+      const m = parts.find(p => p.type === 'month')?.value;
+      const d = parts.find(p => p.type === 'day')?.value;
+
+      return `${y}-${m}-${d}`;
+    } catch (e) {
+      return isoString;
     }
-    // Fallback to Date conversion if format doesn't match
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).split('/').reverse().join('-');
   };
 
   const handleSlotClick = async (slot: SlotResponse) => {
@@ -290,7 +279,7 @@ export default function AdminManageSlots() {
 
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -774,7 +763,7 @@ export default function AdminManageSlots() {
           </div>
         </div>
       )}
-    </AdminLayout>
+    </Layout>
   );
 }
 

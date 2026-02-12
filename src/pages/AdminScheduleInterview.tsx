@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getAllUsers, scheduleInterviewForUser, bulkScheduleInterviews, getSlots, type UserResponse, type BulkScheduleInterviewResponse, type SlotResponse } from '@/lib/api';
 import AdminLayout from '@/components/AdminLayout';
+import ManagerLayout from '@/components/ManagerLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import { debug } from '@/lib/debug';
 import * as XLSX from 'xlsx';
 
 export default function AdminScheduleInterview() {
+  const { isManager } = useAuth();
+  const Layout = isManager ? ManagerLayout : AdminLayout;
   const [activeTab, setActiveTab] = useState<'single' | 'bulk'>('single');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +20,7 @@ export default function AdminScheduleInterview() {
   const [allSlotsCount, setAllSlotsCount] = useState<number>(0); // total from API (for message when all are past)
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlotId, setSelectedSlotId] = useState<string>('');
+  const [prompt, setPrompt] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<any[]>([]);
   const [result, setResult] = useState<BulkScheduleInterviewResponse | null>(null);
@@ -39,7 +44,7 @@ export default function AdminScheduleInterview() {
       // Use admin endpoint - get ALL slots (same as Interview Slots page with 'all' filter)
       // Filter client-side for active slots in the future (show all, even if full)
       const allSlots = await getSlots(undefined, true);
-      
+
       debug.log(`[AdminScheduleInterview] Loaded ${allSlots.length} total slots from API`);
 
       // Filter for slots that are:
@@ -64,36 +69,44 @@ export default function AdminScheduleInterview() {
     }
   };
 
-  // Format date key - extract directly from ISO string to avoid timezone conversion (same as Interview Slots page)
+  // Format date key - extract directly from ISO string to avoid timezone conversion
   const formatDateKey = (isoString: string): string => {
-    // Extract date directly from ISO string to avoid timezone conversion
-    // Format: "2026-01-18T09:00:00" or "2026-01-18T09:00:00+00:00" -> "2026-01-18"
-    const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const [, year, month, day] = match;
-      return `${year}-${month}-${day}`;
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return isoString;
+
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(date);
+
+      const y = parts.find(p => p.type === 'year')?.value;
+      const m = parts.find(p => p.type === 'month')?.value;
+      const d = parts.find(p => p.type === 'day')?.value;
+
+      return `${y}-${m}-${d}`;
+    } catch (e) {
+      return isoString;
     }
-    // Fallback to Date conversion if format doesn't match
-    const date = new Date(isoString);
-    return date.toISOString().split('T')[0];
   };
 
-  // Format date for display (same as Interview Slots page)
+  // Format date for display
   const formatDate = (isoString: string): string => {
-    const match = isoString.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    if (match) {
-      const [, year, month, day] = match;
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthName = monthNames[parseInt(month, 10) - 1];
-      return `${monthName} ${parseInt(day, 10)}, ${year}`;
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return isoString;
+
+      return date.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch (e) {
+      return isoString;
     }
-    // Fallback to Date conversion if format doesn't match
-    const date = new Date(isoString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   // Group slots by date (same logic as Interview Slots page)
@@ -119,7 +132,7 @@ export default function AdminScheduleInterview() {
 
   // Get slots for selected date - ALL slots for that date (including full ones)
   const slotsForSelectedDate = selectedDate ? (slotsByDate[selectedDate] || []) : [];
-  
+
   // Debug logging
   if (selectedDate && slotsForSelectedDate.length > 0) {
     debug.log(`[AdminScheduleInterview] Selected date: ${selectedDate}, Found ${slotsForSelectedDate.length} slots`);
@@ -131,32 +144,28 @@ export default function AdminScheduleInterview() {
     })));
   }
 
-  // Format time for display - extract directly from ISO string to avoid timezone conversion
+  // Format time for display
   const formatSlotTime = (isoString: string): string => {
-    // Extract time directly from ISO string
-    const timeMatch = isoString.match(/T(\d{2}):(\d{2}):?(\d{2})?/);
-    if (timeMatch) {
-      const [, hourStr, minuteStr] = timeMatch;
-      const hours = parseInt(hourStr, 10);
-      const minutes = parseInt(minuteStr, 10);
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours % 12 || 12;
-      const displayMinutes = String(minutes).padStart(2, '0');
-      return `${displayHours}:${displayMinutes} ${ampm}`;
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return isoString;
+
+      return date.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      return isoString;
     }
-    // Fallback to Date conversion
-    const date = new Date(isoString);
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    const displayMinutes = String(minutes).padStart(2, '0');
-    return `${displayHours}:${displayMinutes} ${ampm}`;
   };
 
   // Format date for display
   const formatDateDisplay = (dateStr: string): string => {
-    return formatDate(dateStr + 'T00:00:00');
+    // Ensure we handle both ISO strings and simple date strings YYYY-MM-DD
+    const isoString = dateStr.includes('T') ? dateStr : `${dateStr}T00:00:00`;
+    return formatDate(isoString);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,6 +187,7 @@ export default function AdminScheduleInterview() {
       const data = await scheduleInterviewForUser({
         user_id: selectedUserId,
         slot_id: selectedSlotId,
+        prompt: prompt.trim() || undefined,
       });
 
       setInterviewUrl(data.interviewUrl);
@@ -187,6 +197,7 @@ export default function AdminScheduleInterview() {
       setSelectedUserId('');
       setSelectedDate('');
       setSelectedSlotId('');
+      setPrompt('');
 
       // Reload users and slots to update status
       await Promise.all([loadUsers(), loadAvailableSlots()]);
@@ -272,7 +283,7 @@ export default function AdminScheduleInterview() {
   };
 
   return (
-    <AdminLayout>
+    <Layout>
       <div className="space-y-6">
         {/* Tabs */}
         <div className="border-b border-border">
@@ -284,8 +295,8 @@ export default function AdminScheduleInterview() {
                 setSuccess(false);
               }}
               className={`border-b-2 px-1 py-4 text-sm font-medium transition-colors ${activeTab === 'single'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-muted-foreground hover:border-gray-300 hover:text-foreground'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:border-gray-300 hover:text-foreground'
                 }`}
             >
               Single Interview
@@ -297,8 +308,8 @@ export default function AdminScheduleInterview() {
                 setSuccess(false);
               }}
               className={`border-b-2 px-1 py-4 text-sm font-medium transition-colors ${activeTab === 'bulk'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-muted-foreground hover:border-gray-300 hover:text-foreground'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-muted-foreground hover:border-gray-300 hover:text-foreground'
                 }`}
             >
               Bulk Schedule
@@ -413,6 +424,21 @@ export default function AdminScheduleInterview() {
                 )}
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-medium">
+                  Custom Agent Prompt <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
+                </label>
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[100px]"
+                  placeholder="Enter specific instructions for the AI interviewer (e.g., 'Focus on React hooks', 'Be more aggressive with follow-up questions', etc.)"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  This text will be appended to the system instructions for this specific interview.
+                </p>
+              </div>
+
               <div className="flex justify-end gap-4 pt-4">
                 <button
                   type="submit"
@@ -518,7 +544,7 @@ export default function AdminScheduleInterview() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </Layout>
   );
 }
 

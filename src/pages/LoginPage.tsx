@@ -27,13 +27,15 @@ export default function LoginPage() {
       if (response.success && response.token && response.user) {
         const user: User = {
           ...response.user,
-          role: response.user.role as 'admin' | 'student',
+          role: response.user.role as 'admin' | 'manager' | 'student',
         };
         authLogin(user, response.token);
 
         // Navigate based on role
         if (response.user.role === 'admin') {
           navigate('/admin/dashboard');
+        } else if (response.user.role === 'manager') {
+          navigate('/manager/dashboard');
         } else {
           // Check if password change is required
           if (response.must_change_password) {

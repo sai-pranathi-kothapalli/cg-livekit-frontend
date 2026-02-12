@@ -22,11 +22,15 @@ const AdminManageUsers = lazy(() => import('./pages/AdminManageUsers'));
 const AdminScheduleInterview = lazy(() => import('./pages/AdminScheduleInterview'));
 const AdminManageSlots = lazy(() => import('./pages/AdminManageSlots'));
 const AdminGeminiUsagePage = lazy(() => import('./pages/AdminGeminiUsagePage'));
+const AdminManageManagers = lazy(() => import('./pages/AdminManageManagers'));
+const AdminSystemInstructions = lazy(() => import('./pages/AdminSystemInstructions'));
+const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
 const UserApplicationForm = lazy(() => import('./pages/UserApplicationForm'));
 const UserApplicationView = lazy(() => import('./pages/UserApplicationView'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const StudentProfile = lazy(() => import('./pages/StudentProfile'));
 const StudentMyInterviews = lazy(() => import('./pages/StudentMyInterviews'));
+const StudentOverallAnalysis = lazy(() => import('./pages/StudentOverallAnalysis'));
 const StudentApplicationForm = lazy(() => import('./pages/StudentApplicationForm'));
 const InterviewEvaluationPage = lazy(() => import('./pages/InterviewEvaluationPage'));
 const ChangePassword = lazy(() => import('./pages/ChangePassword'));
@@ -162,6 +166,63 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin/manage-managers"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminManageManagers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/system-instructions"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminSystemInstructions />
+                </ProtectedRoute>
+              }
+            />
+            {/* Manager Routes */}
+            <Route
+              path="/manager/dashboard"
+              element={
+                <ProtectedRoute requireManager>
+                  <ManagerDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/slots"
+              element={
+                <ProtectedRoute requireManager>
+                  <AdminManageSlots />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/enroll-user"
+              element={
+                <ProtectedRoute requireManager>
+                  <AdminEnrollUser />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/manage-users"
+              element={
+                <ProtectedRoute requireManager>
+                  <AdminManageUsers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/manager/schedule-interview"
+              element={
+                <ProtectedRoute requireManager>
+                  <AdminScheduleInterview />
+                </ProtectedRoute>
+              }
+            />
             {/* Student Routes */}
             <Route
               path="/student/dashboard"
@@ -200,6 +261,14 @@ function App() {
               element={
                 <ProtectedRoute requireStudent>
                   <StudentMyInterviews />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/student/overall-analysis"
+              element={
+                <ProtectedRoute requireStudent>
+                  <StudentOverallAnalysis />
                 </ProtectedRoute>
               }
             />

@@ -18,21 +18,29 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-linear-to-b from-slate-950 via-slate-900 to-background text-foreground">
       {/* Header */}
-      <header className="border-b border-border bg-card">
+      <header className="border-b border-border bg-background/60 backdrop-blur">
         <div className="container mx-auto flex items-center justify-between px-6 py-4">
           <a
-            href="https://sreedharscce.com"
+            href="https://codegnan.com"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-3"
           >
             <img
               src="/sreedhar-logo.png"
-              alt="Sreedhar CCE Logo"
-              className="h-20 w-auto object-contain"
+              alt="Codegnan Logo"
+              className="h-12 w-auto object-contain"
             />
+            <div className="flex flex-col">
+              <span className="text-base font-semibold tracking-tight">
+                Codegnan AI Interview Platform
+              </span>
+              <span className="text-xs text-muted-foreground">
+                AI-powered mock interviews for modern careers
+              </span>
+            </div>
           </a>
           <div className="flex items-center gap-4">
             <button
@@ -46,68 +54,68 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="container mx-auto px-6 py-16">
-        <div className="mx-auto max-w-4xl text-center">
-          <h1 className="mb-6 text-4xl font-bold tracking-tight md:text-5xl lg:text-6xl">
-            Welcome to Sreedhar CCE
-            <br />
-            <span className="text-primary">Interview Platform</span>
+      <section className="container mx-auto px-6 py-20">
+        <div className="mx-auto max-w-5xl text-center">
+          <h1 className="mb-6 text-4xl font-extrabold tracking-tight md:text-5xl lg:text-6xl">
+            Codegnan AI Interview Platform
           </h1>
-          <p className="mb-4 text-xl text-muted-foreground">
-            Results Super Star
+          <p className="mb-4 text-lg md:text-xl text-muted-foreground">
+            Experience real-time AI-powered mock interviews designed to prepare you for technical, HR, and placement interviews.
           </p>
-          <p className="mb-8 text-lg text-muted-foreground">
-            Professional interview platform for Regional Rural Bank Probationary Officer (PO) positions.
-            <br />
-            Experience seamless, AI-powered interviews designed to help you succeed.
+          <p className="mb-10 text-base md:text-lg text-muted-foreground">
+            Practice like it&apos;s the real interview with adaptive AI, structured rounds, and instant feedback to accelerate your career growth.
           </p>
           <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
             <button
               onClick={handleGetStarted}
               className="rounded-md bg-primary px-8 py-3 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
             >
-              {isAuthenticated ? 'Go to Dashboard' : 'Get Started'}
+              Start Interview
             </button>
             <button
               onClick={() => navigate('/jobs')}
               className="rounded-md border border-border bg-background px-8 py-3 text-base font-semibold text-foreground transition hover:bg-accent"
             >
-              View Jobs
+              Explore Interviews
             </button>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section className="border-t border-border bg-muted/30 py-16">
+      <section className="border-t border-border bg-background/60 py-16">
         <div className="container mx-auto px-6">
           <div className="mx-auto max-w-6xl">
             <h2 className="mb-12 text-center text-3xl font-bold">
               Platform Features
             </h2>
-            <div className="grid gap-8 md:grid-cols-3">
-              <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                <div className="mb-4 text-3xl">🎯</div>
-                <h3 className="mb-2 text-xl font-semibold">Structured Interviews</h3>
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl duration-300">
+                <div className="mb-4 text-3xl">🤖</div>
+                <h3 className="mb-2 text-xl font-semibold">AI-Powered Interviews</h3>
                 <p className="text-muted-foreground">
-                  Professional, structured interview process covering all key areas including
-                  banking knowledge, general knowledge, and domain expertise.
+                  Real-time adaptive interviews tailored to your resume, role, and current skill level.
                 </p>
               </div>
-              <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-                <div className="mb-4 text-3xl">💼</div>
-                <h3 className="mb-2 text-xl font-semibold">RRB PO Focus</h3>
+              <div className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl duration-300">
+                <div className="mb-4 text-3xl">💻</div>
+                <h3 className="mb-2 text-xl font-semibold">Technical &amp; HR Rounds</h3>
                 <p className="text-muted-foreground">
-                  Specialized for Regional Rural Bank Probationary Officer positions with
-                  comprehensive evaluation across all required competencies.
+                  Practice coding, system design, and behavioral interviews in structured multi-round flows.
                 </p>
               </div>
-              <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+              <div className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl duration-300">
                 <div className="mb-4 text-3xl">📊</div>
-                <h3 className="mb-2 text-xl font-semibold">Professional Assessment</h3>
+                <h3 className="mb-2 text-xl font-semibold">Instant Performance Feedback</h3>
                 <p className="text-muted-foreground">
-                  Get detailed feedback on your performance to help you improve and
-                  prepare for your banking career.
+                  Get structured evaluation reports with scores, strengths, and clear improvement suggestions.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card/80 p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-xl duration-300">
+                <div className="mb-4 text-3xl">🎓</div>
+                <h3 className="mb-2 text-xl font-semibold">Placement Preparation</h3>
+                <p className="text-muted-foreground">
+                  Built for students preparing for campus placements and job interviews across domains.
                 </p>
               </div>
             </div>
@@ -127,9 +135,9 @@ export default function HomePage() {
                 1
               </div>
               <div>
-                <h3 className="mb-1 text-lg font-semibold">Self Introduction</h3>
+                <h3 className="mb-1 text-lg font-semibold">Resume Upload</h3>
                 <p className="text-muted-foreground">
-                  Share your background, education, and motivation for joining the banking sector.
+                  Upload your resume so our AI can generate a personalized interview tailored to your profile.
                 </p>
               </div>
             </div>
@@ -138,9 +146,9 @@ export default function HomePage() {
                 2
               </div>
               <div>
-                <h3 className="mb-1 text-lg font-semibold">General Knowledge & Current Affairs</h3>
+                <h3 className="mb-1 text-lg font-semibold">Technical Round</h3>
                 <p className="text-muted-foreground">
-                  Demonstrate your awareness of current events, government schemes, and political leaders.
+                  Answer skill-based questions generated from your resume, role, and target technology stack.
                 </p>
               </div>
             </div>
@@ -149,9 +157,9 @@ export default function HomePage() {
                 3
               </div>
               <div>
-                <h3 className="mb-1 text-lg font-semibold">Domain Knowledge</h3>
+                <h3 className="mb-1 text-lg font-semibold">HR &amp; Behavioral Round</h3>
                 <p className="text-muted-foreground">
-                  Showcase your technical knowledge and how it applies to banking operations.
+                  Practice situational, communication, and culture-fit questions in a realistic HR-style conversation.
                 </p>
               </div>
             </div>
@@ -160,20 +168,9 @@ export default function HomePage() {
                 4
               </div>
               <div>
-                <h3 className="mb-1 text-lg font-semibold">Banking & RRB Knowledge</h3>
+                <h3 className="mb-1 text-lg font-semibold">AI Feedback Report</h3>
                 <p className="text-muted-foreground">
-                  Core assessment of banking concepts, RBI functions, and Regional Rural Bank knowledge.
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                5
-              </div>
-              <div>
-                <h3 className="mb-1 text-lg font-semibold">Situational & Feedback</h3>
-                <p className="text-muted-foreground">
-                  Practical scenario-based questions followed by comprehensive feedback on your performance.
+                  Receive detailed performance analytics with scores, insights, and next steps to improve.
                 </p>
               </div>
             </div>
@@ -187,40 +184,56 @@ export default function HomePage() {
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="mb-4 text-3xl font-bold">Ready to Start Your Interview?</h2>
             <p className="mb-8 text-lg text-muted-foreground">
-              Join Sreedhar CCE's interview platform and take the next step in your banking career.
+              Join Codegnan&apos;s AI Interview Platform and get ready for your next technical, HR, or placement interview.
             </p>
             <button
               onClick={handleGetStarted}
               className="rounded-md bg-primary px-8 py-3 text-base font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90"
             >
-              {isAuthenticated ? 'Go to Dashboard' : 'Get Started Now'}
+              {isAuthenticated ? 'Go to Dashboard' : 'Start Interview Now'}
             </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border bg-card py-8">
+      <footer className="border-t border-border bg-card/80 py-8 backdrop-blur">
         <div className="container mx-auto px-6">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <div className="flex items-center gap-3">
               <img
                 src="/sreedhar-logo.png"
-                alt="Sreedhar CCE Logo"
+                alt="Codegnan Logo"
                 className="h-16 w-auto object-contain"
               />
               <span className="text-sm text-muted-foreground">
-                Sreedhar CCE - Results Super Star
+                Codegnan - AI Powered Career Platform
               </span>
             </div>
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <a
-                href="https://sreedharscce.com"
+                href="https://codegnan.com"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-foreground transition"
               >
-                Visit Website
+                About Us
+              </a>
+              <a
+                href="https://codegnan.com/contact"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition"
+              >
+                Contact
+              </a>
+              <a
+                href="https://codegnan.com/careers"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-foreground transition"
+              >
+                Careers
               </a>
               <button
                 onClick={() => navigate('/jobs')}
@@ -237,7 +250,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-6 border-t border-border pt-6 text-center text-sm text-muted-foreground">
-            <p>© {new Date().getFullYear()} Sreedhar CCE. All rights reserved.</p>
+            <p>© 2026 Codegnan IT Solutions. All rights reserved.</p>
           </div>
         </div>
       </footer>

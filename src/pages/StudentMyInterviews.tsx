@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StudentLayout from '@/components/StudentLayout';
-import { getMyInterview, type MyInterviewResponse } from '@/lib/api';
+import { getMyInterview, getStudentAnalytics, type MyInterviewResponse, type StudentAnalyticsResponse } from '@/lib/api';
 import { debug } from '@/lib/debug';
 
 export default function StudentMyInterviews() {
@@ -10,9 +10,12 @@ export default function StudentMyInterviews() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interviewData, setInterviewData] = useState<MyInterviewResponse | null>(null);
+  const [analytics, setAnalytics] = useState<StudentAnalyticsResponse | null>(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
 
   useEffect(() => {
     loadInterviewData();
+    loadAnalytics();
   }, []);
 
   const loadInterviewData = async () => {
@@ -28,12 +31,26 @@ export default function StudentMyInterviews() {
     }
   };
 
+  const loadAnalytics = async () => {
+    try {
+      const data = await getStudentAnalytics();
+      setAnalytics(data);
+    } catch (err) {
+      debug.error('Failed to load analytics:', err);
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
 
-  // Format date and time
+
+  // Format date and time in IST
   const formatDateDisplay = (isoString: string): string => {
     try {
       const date = new Date(isoString);
-      return date.toLocaleDateString('en-US', {
+      if (isNaN(date.getTime())) return isoString;
+
+      return date.toLocaleDateString('en-IN', {
+        timeZone: 'Asia/Kolkata',
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -46,8 +63,10 @@ export default function StudentMyInterviews() {
   const formatSlotTime = (isoString: string): string => {
     try {
       const date = new Date(isoString);
-      // Format time in 12-hour format with AM/PM
-      return date.toLocaleTimeString('en-US', {
+      if (isNaN(date.getTime())) return isoString;
+
+      return date.toLocaleTimeString('en-IN', {
+        timeZone: 'Asia/Kolkata',
         hour: '2-digit',
         minute: '2-digit',
         hour12: true
@@ -133,7 +152,7 @@ export default function StudentMyInterviews() {
                   const booking = item.booking;
                   const slot = item.slot;
                   const scheduledAt = slot?.slot_datetime || slot?.start_time || booking?.scheduled_at;
-                  
+
                   return (
                     <div
                       key={index}
@@ -192,7 +211,7 @@ export default function StudentMyInterviews() {
                   const booking = item.booking;
                   const slot = item.slot;
                   const scheduledAt = slot?.slot_datetime || slot?.start_time || booking?.scheduled_at;
-                  
+
                   return (
                     <div
                       key={index}
@@ -232,12 +251,12 @@ export default function StudentMyInterviews() {
                   const booking = item.booking;
                   const slot = item.slot;
                   const bookingToken = booking?.token || (typeof booking === 'string' ? booking : null);
-                  
+
                   if (!bookingToken) {
                     debug.warn('Completed interview missing token:', item);
                     return null;
                   }
-                  
+
                   return (
                     <div
                       key={index}
@@ -246,13 +265,13 @@ export default function StudentMyInterviews() {
                       <div className="flex items-center justify-between">
                         <div className="space-y-2">
                           <div className="font-semibold">
-                            {slot?.slot_datetime ? formatDateTime(slot.slot_datetime) : 
-                             slot?.start_time ? formatDateTime(slot.start_time) :
-                             booking?.scheduled_at ? formatDateTime(booking.scheduled_at) :
-                             'Interview Completed'}
+                            {slot?.slot_datetime ? formatDateTime(slot.slot_datetime) :
+                              slot?.start_time ? formatDateTime(slot.start_time) :
+                                booking?.scheduled_at ? formatDateTime(booking.scheduled_at) :
+                                  'Interview Completed'}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {booking?.scheduled_at ? 
+                            {booking?.scheduled_at ?
                               `Completed on ${formatDateDisplay(booking.scheduled_at)}` :
                               'Interview completed'}
                           </div>

@@ -163,7 +163,7 @@ export async function uploadApplication(file: File): Promise<UploadApplicationRe
   const formData = new FormData();
   formData.append('file', file);
 
-  return apiRequest<UploadApplicationResponse>(`${API_BASE_URL}/api/upload-application`, {
+  return apiRequest<UploadApplicationResponse>(`${API_BASE_URL}/api/resume/upload-application`, {
     method: 'POST',
     body: formData,
   });
@@ -173,7 +173,7 @@ export async function uploadApplication(file: File): Promise<UploadApplicationRe
  * Schedule an interview
  */
 export async function scheduleInterview(data: ScheduleInterviewRequest): Promise<ScheduleInterviewResponse> {
-  return apiRequest<ScheduleInterviewResponse>(`${API_BASE_URL}/api/schedule-interview`, {
+  return apiRequest<ScheduleInterviewResponse>(`${API_BASE_URL}/api/bookings/schedule-interview`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -201,7 +201,7 @@ export async function getInterviewAccessConfig(): Promise<InterviewAccessConfig>
  */
 export async function getBooking(token: string): Promise<BookingResponse | null> {
   try {
-    return await apiRequest<BookingResponse>(`${API_BASE_URL}/api/booking/${token}`, {
+    return await apiRequest<BookingResponse>(`${API_BASE_URL}/api/bookings/booking/${token}`, {
       headers: getAuthHeaders(),
     });
   } catch (error: any) {
@@ -269,7 +269,7 @@ export interface EvaluationResponse {
  * Get evaluation data for an interview from the backend API.
  */
 export async function getEvaluation(token: string): Promise<EvaluationResponse> {
-  return apiRequest<EvaluationResponse>(`${API_BASE_URL}/api/evaluation/${token}`, {
+  return apiRequest<EvaluationResponse>(`${API_BASE_URL}/api/interviews/evaluation/${token}`, {
     headers: getAuthHeaders(),
   });
 }
@@ -312,7 +312,7 @@ export interface ResetPasswordRequest {
  * Unified login - automatically detects admin or student
  */
 export async function login(data: LoginRequest): Promise<LoginResponse> {
-  const result = await apiRequest<LoginResponse>(`${API_BASE_URL}/api/login`, {
+  const result = await apiRequest<LoginResponse>(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -383,7 +383,7 @@ export interface BulkRegistrationResponse {
  * Admin login
  */
 export async function adminLogin(data: AdminLoginRequest): Promise<AdminLoginResponse> {
-  const result = await apiRequest<AdminLoginResponse>(`${API_BASE_URL}/api/admin/login`, {
+  const result = await apiRequest<AdminLoginResponse>(`${API_BASE_URL}/api/auth/admin/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -427,9 +427,6 @@ export async function registerCandidate(data: CandidateRegistrationRequest): Pro
   });
 }
 
-/**
- * Bulk register candidates from Excel file
- */
 export async function bulkRegisterCandidates(file: File): Promise<BulkRegistrationResponse> {
   const formData = new FormData();
   formData.append('file', file);
@@ -440,7 +437,7 @@ export async function bulkRegisterCandidates(file: File): Promise<BulkRegistrati
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  return apiRequest<BulkRegistrationResponse>(`${API_BASE_URL}/api/admin/bulk-register`, {
+  return apiRequest<BulkRegistrationResponse>(`${API_BASE_URL}/api/admin/candidates/bulk-register`, {
     method: 'POST',
     headers,
     body: formData,
@@ -561,11 +558,8 @@ export interface MyInterviewResponse {
   }>;
 }
 
-/**
- * Enroll a new user
- */
 export async function enrollUser(data: EnrollUserRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>(`${API_BASE_URL}/api/admin/users`, {
+  return apiRequest<UserResponse>(`${API_BASE_URL}/api/users/`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -576,7 +570,7 @@ export async function enrollUser(data: EnrollUserRequest): Promise<UserResponse>
  * Get all enrolled users
  */
 export async function getAllUsers(): Promise<UserResponse[]> {
-  return apiRequest<UserResponse[]>(`${API_BASE_URL}/api/admin/users`, {
+  return apiRequest<UserResponse[]>(`${API_BASE_URL}/api/users/`, {
     headers: getAuthHeaders(),
   });
 }
@@ -585,7 +579,7 @@ export async function getAllUsers(): Promise<UserResponse[]> {
  * Get a user by ID
  */
 export async function getUser(userId: string): Promise<UserDetailResponse> {
-  return apiRequest<UserDetailResponse>(`${API_BASE_URL}/api/admin/users/${userId}`, {
+  return apiRequest<UserDetailResponse>(`${API_BASE_URL}/api/users/${userId}`, {
     headers: getAuthHeaders(),
   });
 }
@@ -594,7 +588,7 @@ export async function getUser(userId: string): Promise<UserDetailResponse> {
  * Update a user
  */
 export async function updateUser(userId: string, data: UpdateUserRequest): Promise<UserResponse> {
-  return apiRequest<UserResponse>(`${API_BASE_URL}/api/admin/users/${userId}`, {
+  return apiRequest<UserResponse>(`${API_BASE_URL}/api/users/${userId}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -605,7 +599,7 @@ export async function updateUser(userId: string, data: UpdateUserRequest): Promi
  * Delete a user
  */
 export async function deleteUser(userId: string): Promise<void> {
-  return apiRequest<void>(`${API_BASE_URL}/api/admin/users/${userId}`, {
+  return apiRequest<void>(`${API_BASE_URL}/api/users/${userId}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -652,7 +646,7 @@ export async function getSlots(status?: string, includePast: boolean = false): P
   if (status) params.append('status', status);
   if (includePast) params.append('include_past', 'true');
 
-  const url = `${API_BASE_URL}/api/admin/slots${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `${API_BASE_URL}/api/slots/admin/slots${params.toString() ? '?' + params.toString() : ''}`;
   return apiRequest<SlotResponse[]>(url, {
     headers: getAuthHeaders(),
   });
@@ -811,7 +805,7 @@ export async function uploadApplicationForm(file: File): Promise<{ success: bool
  * Create a new interview slot
  */
 export async function createSlot(data: CreateSlotRequest): Promise<SlotResponse> {
-  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/admin/slots`, {
+  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/slots/admin/slots`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -830,7 +824,7 @@ export async function updateSlot(slotId: string, data: UpdateSlotRequest): Promi
     updateData.slot_datetime = new Date(data.slot_datetime).toISOString();
   }
 
-  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/admin/slots/${slotId}`, {
+  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/slots/admin/slots/${slotId}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(updateData),
@@ -841,7 +835,7 @@ export async function updateSlot(slotId: string, data: UpdateSlotRequest): Promi
  * Delete an interview slot
  */
 export async function deleteSlot(slotId: string): Promise<void> {
-  return apiRequest<void>(`${API_BASE_URL}/api/admin/slots/${slotId}`, {
+  return apiRequest<void>(`${API_BASE_URL}/api/slots/admin/slots/${slotId}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
@@ -867,7 +861,7 @@ export interface CreateDaySlotsResponse {
 }
 
 export async function createDaySlots(data: CreateDaySlotsRequest): Promise<CreateDaySlotsResponse> {
-  return apiRequest<CreateDaySlotsResponse>(`${API_BASE_URL}/api/admin/slots/create-day`, {
+  return apiRequest<CreateDaySlotsResponse>(`${API_BASE_URL}/api/slots/admin/slots/create-day`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),
@@ -887,7 +881,7 @@ export async function bulkEnrollUsers(file: File): Promise<BulkEnrollResponse> {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  return apiRequest<BulkEnrollResponse>(`${API_BASE_URL}/api/admin/users/bulk-enroll`, {
+  return apiRequest<BulkEnrollResponse>(`${API_BASE_URL}/api/users/bulk-enroll`, {
     method: 'POST',
     headers,
     body: formData,
@@ -972,7 +966,7 @@ export interface StudentLoginResponse {
  * Student registration
  */
 export async function studentRegister(data: StudentRegisterRequest): Promise<StudentLoginResponse> {
-  const result = await apiRequest<StudentLoginResponse>(`${API_BASE_URL}/api/student/register`, {
+  const result = await apiRequest<StudentLoginResponse>(`${API_BASE_URL}/api/auth/student/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -989,10 +983,13 @@ export async function studentRegister(data: StudentRegisterRequest): Promise<Stu
  * Student login
  */
 export async function studentLogin(data: StudentLoginRequest): Promise<StudentLoginResponse> {
-  const result = await apiRequest<StudentLoginResponse>(`${API_BASE_URL}/api/student/login`, {
+  const result = await apiRequest<StudentLoginResponse>(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
+    body: JSON.stringify({
+      username: data.email,
+      password: data.password,
+    }),
   });
 
   if (result.success && result.token && result.user) {
@@ -1004,35 +1001,6 @@ export async function studentLogin(data: StudentLoginRequest): Promise<StudentLo
 
 // ==================== User API Functions ====================
 
-export interface RRBApplicationFormData {
-  // This will match the RRBFormData interface from UserApplicationForm
-  [key: string]: any;
-}
-
-/**
- * Submit RRB application form
- */
-export async function submitRRBApplication(formData: RRBApplicationFormData): Promise<ScheduleInterviewResponse> {
-  return apiRequest<ScheduleInterviewResponse>(`${API_BASE_URL}/api/user/application`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(formData),
-  });
-}
-
-/**
- * Get application by token
- */
-export async function getApplicationByToken(token: string): Promise<RRBApplicationFormData | null> {
-  try {
-    return await apiRequest<RRBApplicationFormData>(`${API_BASE_URL}/api/user/application/${token}`);
-  } catch (error: any) {
-    if (error.message.includes('404') || error.message.includes('not found')) {
-      return null;
-    }
-    throw error;
-  }
-}
 /**
  * Get all managers
  */

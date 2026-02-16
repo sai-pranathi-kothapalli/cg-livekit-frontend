@@ -25,8 +25,6 @@ const AdminGeminiUsagePage = lazy(() => import('./pages/AdminGeminiUsagePage'));
 const AdminManageManagers = lazy(() => import('./pages/AdminManageManagers'));
 const AdminSystemInstructions = lazy(() => import('./pages/AdminSystemInstructions'));
 const ManagerDashboard = lazy(() => import('./pages/ManagerDashboard'));
-const UserApplicationForm = lazy(() => import('./pages/UserApplicationForm'));
-const UserApplicationView = lazy(() => import('./pages/UserApplicationView'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard'));
 const StudentProfile = lazy(() => import('./pages/StudentProfile'));
 const StudentMyInterviews = lazy(() => import('./pages/StudentMyInterviews'));
@@ -292,8 +290,6 @@ function App() {
             <Route path="/jobs" element={<Navigate to="/student/jobs" replace />} />
             <Route path="/apply" element={<Navigate to="/student/apply" replace />} />
             {/* Other Routes */}
-            <Route path="/user/application" element={<UserApplicationForm />} />
-            <Route path="/user/application/view" element={<UserApplicationView />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

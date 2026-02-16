@@ -88,60 +88,60 @@ export const SessionView = ({
 }: React.ComponentProps<'section'> & SessionViewProps) => {
   const session = useSessionContext();
   const { messages } = useSessionMessages(session);
-  
+
   // Timer state
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [interviewStartTime, setInterviewStartTime] = useState<Date | null>(null);
   const [isInterviewCompleted, setIsInterviewCompleted] = useState(false);
-  
+
   // Confirmation modal state
   const [showExitModal, setShowExitModal] = useState(false);
-  
+
   // Manual transcript messages state (for messages not picked up by useSessionMessages)
   const [manualTranscriptMessages, setManualTranscriptMessages] = useState<ReceivedMessage[]>([]);
-  
+
   // Merge regular messages with manually captured transcript messages, removing duplicates
   // Deduplicate based on message content, timestamp, and origin (within 2 seconds)
   // Also handles partial vs full message duplicates (removes partial, keeps full)
   const allMessages = React.useMemo(() => {
     const combined = [...messages, ...manualTranscriptMessages];
-    
+
     // Group messages by origin and timestamp bucket
     const messageGroups = new Map<string, ReceivedMessage[]>();
-    
+
     combined.forEach(msg => {
       const timestampBucket = Math.floor((msg.timestamp || 0) / 2000);
       const origin = msg.from?.isLocal ? 'local' : 'remote';
       const groupKey = `${timestampBucket}-${origin}`;
-      
+
       if (!messageGroups.has(groupKey)) {
         messageGroups.set(groupKey, []);
       }
       messageGroups.get(groupKey)!.push(msg);
     });
-    
+
     // Within each group, remove duplicates and keep longest message (full vs partial)
     const result: ReceivedMessage[] = [];
-    
+
     messageGroups.forEach((groupMessages) => {
       // Sort by length (longest first) to prioritize full messages
       groupMessages.sort((a, b) => (b.message?.length || 0) - (a.message?.length || 0));
-      
+
       const seen: string[] = [];
-      
+
       for (const msg of groupMessages) {
         const messageContent = msg.message || '';
-        
+
         // Check if this message is a duplicate or prefix of an already seen message
         let isDuplicate = false;
-        
+
         for (const seenContent of seen) {
           // Exact match
           if (seenContent === messageContent) {
             isDuplicate = true;
             break;
           }
-          
+
           // Check if current message is a prefix of seen message (current is shorter)
           // Since we sorted longest first, seenContent should be longer
           if (seenContent.startsWith(messageContent)) {
@@ -149,7 +149,7 @@ export const SessionView = ({
             isDuplicate = true;
             break;
           }
-          
+
           // Check if seen message is a prefix of current (current is longer)
           if (messageContent.startsWith(seenContent)) {
             // Seen is shorter prefix - remove it and keep current (longer)
@@ -165,17 +165,17 @@ export const SessionView = ({
             break;
           }
         }
-        
+
         if (!isDuplicate) {
           seen.push(messageContent);
           result.push(msg);
         }
       }
     });
-    
+
     // Sort result by timestamp to maintain order
     result.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    
+
     // Deduplicate local (user) messages by exact content so same transcript doesn't appear twice
     const seenLocalContent = new Set<string>();
     const deduped = result.filter(m => {
@@ -187,10 +187,10 @@ export const SessionView = ({
       }
       return true;
     });
-    
+
     return deduped;
   }, [messages, manualTranscriptMessages]);
-  
+
   // DEBUG: Log all messages to verify reception
   useEffect(() => {
     debug.log('📨 MESSAGES DEBUG:', {
@@ -198,7 +198,7 @@ export const SessionView = ({
       regularMessages: messages.length,
       manualMessages: manualTranscriptMessages.length,
     });
-    
+
     // Log FULL message details
     if (allMessages.length > 0) {
       debug.log('📋 FULL MESSAGE DETAILS:', JSON.stringify(allMessages[0], null, 2));
@@ -208,7 +208,7 @@ export const SessionView = ({
       debug.log('📋 Is local?', allMessages[0].from?.isLocal);
       debug.log('📋 From identity:', allMessages[0].from?.identity);
     }
-    
+
     const agentMessages = allMessages.filter(msg => !msg.from?.isLocal);
     debug.log('🤖 AGENT MESSAGES COUNT:', agentMessages.length);
     if (agentMessages.length > 0) {
@@ -224,12 +224,12 @@ export const SessionView = ({
       });
     }
   }, [allMessages, messages, manualTranscriptMessages]);
-  
+
   // Transcript is always visible in one-to-one interview
   const chatOpen = true; // Always show transcript
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [streamingMessages, setStreamingMessages] = useState<StreamingMessage[]>([]);
-  
+
   // Auto-scroll transcript when new messages arrive
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -239,20 +239,20 @@ export const SessionView = ({
   const streamingIntervals = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const completedMessageIds = useRef<Set<string>>(new Set());
   const streamingMessageIds = useRef<Set<string>>(new Set());
-  
+
   // Check if there are pending agent messages (not yet displayed)
   const hasPendingAgentMessage = allMessages.some(msg => {
     const isAgentMessage = !msg.from?.isLocal;
     return isAgentMessage && !completedMessageIds.current.has(msg.id);
   });
-  
+
   // Initialize interview start time when session connects
   useEffect(() => {
     if (session.isConnected && !interviewStartTime) {
       // Use scheduled time if available, otherwise use current time
       const startTime = scheduledAt ? new Date(scheduledAt) : new Date();
       setInterviewStartTime(startTime);
-      
+
       // If we have duration, calculate initial time remaining
       if (interviewDuration) {
         const now = new Date();
@@ -262,7 +262,7 @@ export const SessionView = ({
       }
     }
   }, [session.isConnected, scheduledAt, interviewDuration, interviewStartTime]);
-  
+
   // Enter fullscreen when interview starts
   useEffect(() => {
     if (session.isConnected && !isInterviewCompleted) {
@@ -291,16 +291,16 @@ export const SessionView = ({
           // Fullscreen might be blocked by browser policy, continue anyway
         }
       };
-      
+
       // Small delay to ensure page is ready
       const timeout = setTimeout(() => {
         enterFullscreen();
       }, 500);
-      
+
       return () => clearTimeout(timeout);
     }
   }, [session.isConnected, isInterviewCompleted]);
-  
+
   // Exit fullscreen when interview ends or disconnects
   useEffect(() => {
     if (isInterviewCompleted || !session.isConnected) {
@@ -326,14 +326,14 @@ export const SessionView = ({
           debug.warn('⚠️ Failed to exit fullscreen:', error);
         }
       };
-      
+
       // Only exit if we're actually in fullscreen and interview has ended
       if (isInterviewCompleted || (!session.isConnected && interviewStartTime)) {
         exitFullscreen();
       }
     }
   }, [isInterviewCompleted, session.isConnected, interviewStartTime]);
-  
+
   // Handle fullscreen change events (user pressing ESC, etc.)
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -343,19 +343,19 @@ export const SessionView = ({
         (document as any).mozFullScreenElement ||
         (document as any).msFullscreenElement
       );
-      
+
       // If user manually exits fullscreen during interview, we can optionally re-enter
       // But for now, we'll respect their choice and not force it back
       if (!isFullscreen && session.isConnected && !isInterviewCompleted) {
         debug.log('ℹ️ User exited fullscreen manually');
       }
     };
-    
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
     document.addEventListener('mozfullscreenchange', handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', handleFullscreenChange);
-    
+
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
@@ -363,18 +363,18 @@ export const SessionView = ({
       document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, [session.isConnected, isInterviewCompleted]);
-  
+
   // Update timer every second (display only). Do NOT redirect when local timer hits 0.
   // Only the server (interview_completed) can end the interview and trigger redirect.
   useEffect(() => {
     if (!interviewStartTime || !interviewDuration) return;
-    
+
     const interval = setInterval(() => {
       const now = new Date();
       const elapsed = (now.getTime() - interviewStartTime.getTime()) / 60000; // minutes
       const remaining = Math.max(0, interviewDuration - elapsed);
       setTimeRemaining(remaining);
-      
+
       // When local timer hits 0: only update display to 00:00. Do NOT redirect or set completed.
       // The worker is the single source of truth; it will send interview_completed at 90%/100%
       // and only then we redirect (handled in data channel handler).
@@ -383,15 +383,15 @@ export const SessionView = ({
         debug.log('⏰ Timer reached 00:00 (display only). Waiting for server to send interview_completed.');
       }
     }, 1000); // Update every second
-    
+
     return () => clearInterval(interval);
   }, [interviewStartTime, interviewDuration, isInterviewCompleted]);
-  
+
   // Format time remaining for display
   const formatTimeRemaining = (minutes: number | null): string => {
     if (minutes === null) return '--:--';
     if (minutes <= 0) return '00:00';
-    
+
     const totalSeconds = Math.floor(minutes * 60);
     const mins = Math.floor(totalSeconds / 60);
     const secs = totalSeconds % 60;
@@ -401,7 +401,7 @@ export const SessionView = ({
   // Expose room info via console command
   useEffect(() => {
     const room = session.room;
-    
+
     if (room) {
       // Create a function to get room info that can be called from console
       (window as any).getRoomInfo = () => {
@@ -409,12 +409,12 @@ export const SessionView = ({
           debug.log('❌ No room connected');
           return;
         }
-        
+
         debug.log('🏠 ROOM INFORMATION:');
         debug.log('   Room Name:', room.name);
         debug.log('   Room SID:', (room as any).sid || 'N/A');
         debug.log('   Room State:', room.state);
-        
+
         // Log local participant
         if (room.localParticipant) {
           debug.log('   Local Participant:', {
@@ -423,7 +423,7 @@ export const SessionView = ({
             name: room.localParticipant.name,
           });
         }
-        
+
         // Log remote participants
         const remoteParticipants = Array.from(room.remoteParticipants.values());
         if (remoteParticipants.length > 0) {
@@ -436,7 +436,7 @@ export const SessionView = ({
         } else {
           debug.log('   Remote Participants: None');
         }
-        
+
         return {
           roomName: room.name,
           roomState: room.state,
@@ -453,7 +453,7 @@ export const SessionView = ({
           })),
         };
       };
-      
+
       // Log participant join/leave events to console
       const handleParticipantConnected = (participant: any) => {
         debug.log('✅ PARTICIPANT JOINED:', {
@@ -464,7 +464,7 @@ export const SessionView = ({
           room: room.name,
         });
       };
-      
+
       const handleParticipantDisconnected = (participant: any, reason?: string) => {
         debug.log('❌ PARTICIPANT LEFT:', {
           identity: participant.identity,
@@ -474,7 +474,7 @@ export const SessionView = ({
           room: room.name,
         });
       };
-      
+
       // Listen to data channel messages manually to debug
       // NOTE: Since useSessionMessages already picks up agentTranscript messages automatically,
       // we only need to manually add messages that aren't picked up (fallback only)
@@ -483,7 +483,7 @@ export const SessionView = ({
           const decoder = new TextDecoder();
           const text = decoder.decode(payload);
           const data = JSON.parse(text);
-          
+
           debug.log('📡 DATA CHANNEL MESSAGE RECEIVED:', {
             topic,
             participant: participant?.identity,
@@ -493,14 +493,14 @@ export const SessionView = ({
             rawText: text,
             parsedData: data,
           });
-          
+
           // Check for interview warning (2 minutes before end)
           if (data.type === 'interview_warning') {
             debug.log('⚠️ Interview warning received:', data.message);
             // Could show a toast notification here
             return;
           }
-          
+
           // Check for time remaining update
           if (data.type === 'time_remaining') {
             debug.log('⏰ Time remaining update received:', data.time_remaining_minutes);
@@ -509,65 +509,65 @@ export const SessionView = ({
             }
             return;
           }
-          
+
           // Check for interview completion signal
           if (data.type === 'interview_completed') {
             debug.log('✅ Interview completed signal received:', data);
-            
+
             // Mark interview as completed (this will trigger fullscreen exit)
             setIsInterviewCompleted(true);
-            
+
             // Use token from signal or from props
             const token = data.token || interviewToken;
-            
+
             if (!token) {
               debug.warn('⚠️ Interview completed but no token available for redirect');
               return;
             }
-            
+
             // Show completion message
             if (data.message) {
               debug.log('📢 Completion message:', data.message);
               // You could show a toast/notification here if needed
             }
-            
+
             // Redirect to evaluation page after a short delay (allow time for final data save)
             setTimeout(() => {
               const evaluationUrl = `/evaluation/${token}`;
               debug.log('🔄 Redirecting to evaluation page:', evaluationUrl);
               window.location.href = evaluationUrl;
             }, 3000); // 3 second delay to allow final data to be saved and closing message to finish
-            
+
             return; // Don't process as transcript message
           }
-          
+
           // Check if this is our transcript message (has "message" field)
           // Agent transcripts: sent by remote (agent). User transcripts: sent by agent on behalf of user, show as local
           const isAgentTranscript = data.type === 'agentTranscript' && participant && !participant.isLocal;
           const isUserTranscript = data.type === 'userTranscript'; // Accept from any participant (agent sends it)
-          
+
           if (data.message && typeof data.message === 'string' && (isAgentTranscript || isUserTranscript)) {
             debug.log(`✅ ${data.type} MESSAGE DETECTED:`, data.message.substring(0, 50));
-            
+
             // For userTranscript, display as local (candidate) message; for agentTranscript use sending participant
             const displayFrom = isUserTranscript && room.localParticipant ? room.localParticipant : participant;
-            
+
             // Always add transcript messages to ensure they display
             // We'll deduplicate in the allMessages merge logic
             setManualTranscriptMessages(prev => {
               const now = Date.now();
-              
+
               // Check for duplicates within manual messages only (by content similarity)
               // Allow updates if new message is longer (partial -> full)
               const existingIndex = prev.findIndex(m => {
                 const sameParticipant = m.from?.identity === displayFrom?.identity || m.from?.sid === displayFrom?.sid;
                 const recentTimestamp = Math.abs((m.timestamp || 0) - now) < 5000; // Within 5 seconds
-                const sameOrLongerMessage = data.message === m.message || 
-                                           data.message.startsWith(m.message) || 
-                                           m.message.startsWith(data.message);
+                const sameOrLongerMessage = data.message === m.message ||
+                  data.message.startsWith(m.message) ||
+                  m.message.startsWith(data.message);
                 return sameParticipant && recentTimestamp && sameOrLongerMessage;
               });
-              
+
               // Create a ReceivedMessage object - use displayFrom so userTranscript shows as local user
               const transcriptMessage: ReceivedMessage = {
                 id: `transcript-${now}-${Math.random().toString(36).substring(2, 9)}`,
@@ -576,7 +576,7 @@ export const SessionView = ({
                 from: displayFrom,
                 type: data.type || 'chatMessage', // agentTranscript or userTranscript
               };
-              
+
               if (existingIndex >= 0) {
                 const existing = prev[existingIndex];
                 // If new message is longer (full replacing partial), update it
@@ -591,7 +591,7 @@ export const SessionView = ({
                   return prev;
                 }
               }
-              
+
               // No existing message found, add new one
               debug.log('✅ Adding new transcript message to manual messages state');
               return [...prev, transcriptMessage];
@@ -606,27 +606,37 @@ export const SessionView = ({
           });
         }
       };
-      
+
+      const handleTrackSubscribed = (track: any, _pub: any, participant: any) => {
+        debug.log('🎧 Audio track subscribed:', {
+          kind: track.kind,
+          participant: participant.identity,
+          source: track.source,
+        });
+      };
+
       debug.log('🔧 Registering event handlers...');
-      
+
       // Register event handlers
       room.on('participantConnected', handleParticipantConnected);
       room.on('participantDisconnected', handleParticipantDisconnected);
       room.on('dataReceived', handleDataReceived);
-      
+      room.on('trackSubscribed', handleTrackSubscribed);
+
       // Note: In LiveKit, dataReceived is a room-level event, not participant-level
       // The room.on('dataReceived') should handle all data channel messages
-      
-      debug.log('✅ Data channel handler registered');
-      
+
+      debug.log('✅ Data channel and audio track handlers registered');
+
       return () => {
         room.off('participantConnected', handleParticipantConnected);
         room.off('participantDisconnected', handleParticipantDisconnected);
         room.off('dataReceived', handleDataReceived);
+        room.off('trackSubscribed', handleTrackSubscribed);
         delete (window as any).getRoomInfo;
       };
     }
-    
+
     return () => {
       delete (window as any).getRoomInfo;
     };
@@ -653,7 +663,7 @@ export const SessionView = ({
         alreadyCompleted: completedMessageIds.current.has(msg.id),
         alreadyStreaming: streamingMessageIds.current.has(msg.id),
       });
-      
+
       if (isAgentMessage) {
 
         // If message is already completed, check if it needs updating (might be partial)
@@ -665,15 +675,15 @@ export const SessionView = ({
               return prev;
             }
             // Otherwise, update it (might be a new longer version replacing partial)
-            return prev.map(m => 
-              m.id === msg.id 
+            return prev.map(m =>
+              m.id === msg.id
                 ? { ...m, message: msg.message, isStreaming: false, displayedLength: msg.message.length }
                 : m
             );
           });
           return;
         }
-        
+
         // Check if we're already streaming this message
         if (streamingMessageIds.current.has(msg.id)) {
           // But check if this is a longer version (full replacing partial)
@@ -700,38 +710,38 @@ export const SessionView = ({
             return; // Already streaming same message
           }
         }
-        
+
         // Start streaming this message (with proper initialization)
         const fullText = msg.message;
         const totalLength = fullText.length;
-        
+
         // Smart Hybrid: Get initial display length based on message characteristics
         const getInitialDisplayLength = (text: string): number => {
           const firstWord = text.split(/\s+/)[0] || '';
           const firstWordLength = firstWord.length;
-          
+
           // For very short messages (≤5 chars), show everything immediately
           if (text.length <= 5) {
             return text.length;
           }
-          
+
           // For short messages (≤20 chars), show first word
           if (text.length <= 20) {
             return firstWordLength;
           }
-          
+
           // For long messages, show first word but cap at 15 chars to avoid super long words
           return Math.min(firstWordLength, 15);
         };
-        
+
         const initialDisplayLength = getInitialDisplayLength(fullText);
-        
+
         // Determine streaming mode: character-by-character for short, word-by-word for long
         const useCharacterStreaming = totalLength < 20;
-        
+
         // Use the calculated initial length (ensure it's valid)
         let currentDisplayLength = Math.max(1, Math.min(initialDisplayLength, totalLength));
-        
+
         // Create initial streaming message (start with partial text visible)
         const streamingMsg: StreamingMessage = {
           id: msg.id,
@@ -744,7 +754,7 @@ export const SessionView = ({
           type: msg.type,
           editTimestamp: (msg as any).editTimestamp,
         };
-        
+
         streamingMessageIds.current.add(msg.id);
         debug.log('➕ Adding message to streamingMessages:', {
           id: msg.id,
@@ -759,23 +769,23 @@ export const SessionView = ({
             debug.log('⚠️ Message already in streamingMessages (by ID), skipping');
             return prev;
           }
-          
+
           // Check for duplicates by content and timestamp (within 2 seconds)
           // Also handle partial vs full message duplicates (remove partial, keep full)
-          const existingMsg = prev.find(m => 
+          const existingMsg = prev.find(m =>
             m.messageOrigin === 'remote' &&
             Math.abs(m.timestamp - msg.timestamp) < 2000
           );
-          
+
           if (existingMsg) {
             const existingText = existingMsg.message || '';
-            
+
             // Exact match
             if (existingText === fullText) {
               debug.log('⚠️ Message already in streamingMessages (exact match), skipping');
               return prev;
             }
-            
+
             // Check if one is a prefix of another (partial vs full message)
             if (fullText.startsWith(existingText)) {
               // New message is longer (full), replace old partial one
@@ -796,11 +806,11 @@ export const SessionView = ({
               return prev;
             }
           }
-          
+
           debug.log('✅ Adding new message to streamingMessages, new count:', prev.length + 1);
           return [...prev, streamingMsg];
         });
-        
+
         // Stream progressively (character-by-character for short, word-by-word for long)
         debug.log(`🎬 Starting streaming interval for message ${msg.id} (${useCharacterStreaming ? 'character' : 'word'} mode)`);
         const streamInterval = setInterval(() => {
@@ -814,12 +824,12 @@ export const SessionView = ({
               streamingMessageIds.current.delete(msg.id);
               return prev;
             }
-            
+
             const currentLength = existingMsg.displayedLength || currentDisplayLength;
-            
+
             if (currentLength < totalLength) {
               let newLength = currentLength;
-              
+
               if (useCharacterStreaming) {
                 // Character streaming: add 2-3 characters at a time
                 const charsToAdd = Math.min(3, totalLength - currentLength);
@@ -829,18 +839,18 @@ export const SessionView = ({
                 const words = fullText.split(/(\s+)/);
                 const displayedText = fullText.slice(0, currentLength);
                 const displayedTokens = displayedText.split(/(\s+)/);
-                
+
                 let nextTokenIndex = displayedTokens.length;
                 const tokensToAdd = Math.min(2, Math.max(0, words.length - nextTokenIndex));
                 nextTokenIndex += tokensToAdd;
-                
+
                 const newDisplayedText = words.slice(0, nextTokenIndex).join('');
                 newLength = Math.min(newDisplayedText.length, totalLength);
               }
-              
+
               // Clamp to total length
               newLength = Math.min(newLength, totalLength);
-              
+
               debug.log(`📊 Streaming update for ${msg.id}:`, {
                 currentLength,
                 newLength,
@@ -848,15 +858,15 @@ export const SessionView = ({
                 progress: `${Math.round((newLength / totalLength) * 100)}%`,
                 displayedText: fullText.substring(0, newLength),
               });
-              
+
               // Auto-scroll to bottom while streaming
               if (scrollAreaRef.current) {
                 scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
               }
-              
+
               // Update the message with new length
-              return prev.map(m => 
-                m.id === msg.id 
+              return prev.map(m =>
+                m.id === msg.id
                   ? { ...m, displayedLength: newLength }
                   : m
               );
@@ -867,7 +877,7 @@ export const SessionView = ({
               streamingIntervals.current.delete(msg.id);
               streamingMessageIds.current.delete(msg.id);
               completedMessageIds.current.add(msg.id);
-              
+
               return prev.map(m =>
                 m.id === msg.id
                   ? { ...m, isStreaming: false, displayedLength: fullText.length }
@@ -876,7 +886,7 @@ export const SessionView = ({
             }
           });
         }, useCharacterStreaming ? 30 : 50); // Faster for character streaming (30ms), slower for word streaming (50ms)
-        
+
         streamingIntervals.current.set(msg.id, streamInterval);
       } else {
         // User messages (userTranscript from agent or local) - show in transcript
@@ -896,7 +906,7 @@ export const SessionView = ({
         });
       }
     });
-    
+
     // Do NOT clear all intervals here - this effect runs whenever allMessages changes.
     // Clearing here would stop in-progress streaming when a new message arrives (AI transcript would cut off).
     // Intervals are cleared per-message when streaming completes, and all are cleared on unmount below.
@@ -921,7 +931,7 @@ export const SessionView = ({
         messageOrigin: m.messageOrigin,
       })),
     });
-    
+
     // Log what ChatTranscript will receive
     debug.log('📤 ChatTranscript will receive:', {
       hidden: !chatOpen,
@@ -929,7 +939,7 @@ export const SessionView = ({
       messagesCount: streamingMessages.length,
       messages: streamingMessages,
     });
-    
+
     // Auto-scroll when new messages arrive
     const lastMessage = streamingMessages.at(-1);
     const lastMessageIsLocal = lastMessage?.messageOrigin === 'local';
@@ -943,7 +953,7 @@ export const SessionView = ({
     <section className="bg-background relative z-10 h-screen w-full overflow-hidden flex flex-col" {...props}>
       {/* Room Status Bar with Timer */}
       <RoomStatusBar timeRemaining={timeRemaining} />
-      
+
       {/* Main Content Area: Videos on left, Transcript on right (Google Meet style) */}
       <div className="flex-1 flex flex-row min-h-0 gap-4 pt-14 pb-20 px-4 md:px-6">
         {/* Left Side: Videos Section */}
@@ -967,8 +977,8 @@ export const SessionView = ({
           </div>
 
           {/* Transcript Content */}
-          <ScrollArea 
-            ref={scrollAreaRef} 
+          <ScrollArea
+            ref={scrollAreaRef}
             className="flex-1 px-4 py-4"
           >
             <ChatTranscript
@@ -1016,10 +1026,10 @@ export const SessionView = ({
           />
         </div>
       </MotionBottom>
-      
+
       {/* Exit Confirmation Modal */}
       {showExitModal && (
-        <div 
+        <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={(e) => {
             // Close modal if clicking on backdrop
@@ -1044,7 +1054,7 @@ export const SessionView = ({
                 onClick={async () => {
                   setShowExitModal(false);
                   setIsInterviewCompleted(true);
-                  
+
                   // Exit fullscreen first
                   try {
                     if (document.fullscreenElement) {
@@ -1059,14 +1069,14 @@ export const SessionView = ({
                   } catch (error) {
                     debug.warn('Failed to exit fullscreen:', error);
                   }
-                  
+
                   // Disconnect from session
                   try {
                     await session.end();
                   } catch (error) {
                     debug.warn('Failed to disconnect:', error);
                   }
-                  
+
                   // Redirect to evaluation page
                   const token = interviewToken;
                   if (token) {

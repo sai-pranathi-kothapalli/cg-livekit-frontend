@@ -11,10 +11,10 @@ export default function JobsPage() {
           <h1 className="text-3xl font-bold tracking-tight">
             Regional Rural Bank Probationary Officer (PO)
           </h1>
-          <p className="text-sm text-muted-foreground">Sreedhar's CCE - RESULTS SUPER STAR</p>
+          <p className="text-sm text-muted-foreground">Codegnan Team</p>
           <p>
-            We are conducting interviews for the Regional Rural Bank Probationary Officer (PO) position. 
-            This is an excellent opportunity to build a career in the banking sector and serve rural communities 
+            We are conducting interviews for the Regional Rural Bank Probationary Officer (PO) position.
+            This is an excellent opportunity to build a career in the banking sector and serve rural communities
             through financial inclusion and banking services.
           </p>
         </section>

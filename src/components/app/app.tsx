@@ -89,6 +89,7 @@ export function App({ appConfig, interviewToken, interviewDuration, scheduledAt 
       });
     }
 
+    console.log('[Frontend] 🔄 Creating tokenSource', { interviewToken, agentName: appConfig.agentName });
     // Default: call backend API endpoint
     return TokenSource.custom(async () => {
       const requestBody = {

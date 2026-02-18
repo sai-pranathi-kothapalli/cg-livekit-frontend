@@ -5,7 +5,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getUserData, getUserRole, removeAuthToken, saveAuthToken, saveUserData } from '@/lib/api';
+import { getUserData, getUserRole, removeAuthToken, saveAuthToken, saveUserData } from '@/lib/api/client';
 
 export interface User {
   id: string;

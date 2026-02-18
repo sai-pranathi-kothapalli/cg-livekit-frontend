@@ -1,17 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { App } from '@/components/app/app';
-import { getBooking, getInterviewAccessConfig } from '@/lib/api';
+import { getBooking, getInterviewAccessConfig } from '@/lib/api/bookings';
 import { getAppConfig } from '@/lib/utils';
 import { debug } from '@/lib/debug';
 import type { AppConfig } from '@/app-config';
 import { APP_CONFIG_DEFAULTS } from '@/app-config';
+import { PreInterviewChecks } from '@/components/pre-interview/PreInterviewChecks';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function InterviewPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { isAuthenticated, isStudent, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isStudent, isLoading: authLoading, user } = useAuth();
+  const [checksPassed, setChecksPassed] = useState(false);
+
+  useEffect(() => {
+    console.log('[Frontend] 🏗️ InterviewPage mounted', { token });
+    return () => console.log('[Frontend] 🚮 InterviewPage unmounted');
+  }, [token]);
+
   const [appConfig, setAppConfig] = useState<AppConfig>(APP_CONFIG_DEFAULTS);
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +68,7 @@ export default function InterviewPage() {
 
         // Get booking (backend allows without auth when REQUIRE_LOGIN_FOR_INTERVIEW=false)
         const bookingData = await getBooking(token!);
-        
+
         if (!bookingData) {
           setError('Interview not found');
           setLoading(false);
@@ -69,18 +77,18 @@ export default function InterviewPage() {
 
         // Set booking state FIRST so we can display scheduled time even if there's an error
         setBooking(bookingData);
-        
+
         // Require application form to be submitted before attending interview
         if (bookingData.application_form_submitted === false) {
           setError('application_form_required');
           setLoading(false);
           return;
         }
-        
+
         // Check if interview window is valid (can only join during the scheduled interview time)
         const scheduledAt = new Date(bookingData.scheduled_at);
         const now = new Date();
-        
+
         // Get interview duration from slot or default to 30 minutes
         let durationMinutes = 30;
         if (bookingData.slot?.duration_minutes) {
@@ -93,16 +101,16 @@ export default function InterviewPage() {
             durationMinutes = Math.round((slotEnd.getTime() - slotStart.getTime()) / 60000);
           }
         }
-        
+
         const interviewEndTime = new Date(scheduledAt.getTime() + durationMinutes * 60000);
-        
+
         // Check if current time is before scheduled time
         if (now < scheduledAt) {
           setError('interview_too_early');
           setLoading(false);
           return;
         }
-        
+
         // Check if current time is after interview end time
         if (now > interviewEndTime) {
           setError('interview_expired');
@@ -245,7 +253,7 @@ export default function InterviewPage() {
     const scheduledAt = booking ? new Date(booking.scheduled_at) : new Date();
     const durationMinutes = booking?.slot?.duration_minutes || 30;
     const interviewEndTime = new Date(scheduledAt.getTime() + durationMinutes * 60000);
-    
+
     const formattedStart = scheduledAt.toLocaleString('en-IN', {
       year: 'numeric',
       month: 'short',
@@ -255,7 +263,7 @@ export default function InterviewPage() {
       hour12: true,
       timeZone: 'Asia/Kolkata'
     });
-    
+
     const formattedEnd = interviewEndTime.toLocaleString('en-IN', {
       year: 'numeric',
       month: 'short',
@@ -265,7 +273,7 @@ export default function InterviewPage() {
       hour12: true,
       timeZone: 'Asia/Kolkata'
     });
-    
+
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
         <div className="max-w-md space-y-3 text-center">
@@ -292,10 +300,20 @@ export default function InterviewPage() {
     );
   }
 
-  // Render LiveKit app
+  // 1. Show pre-interview checks if not passed yet
+  if (!checksPassed) {
+    return (
+      <PreInterviewChecks
+        userName={user?.name || "Candidate"}
+        onAllChecksPassed={() => setChecksPassed(true)}
+      />
+    );
+  }
+
+  // 2. Render LiveKit app once checks pass
   return (
-    <App 
-      appConfig={appConfig} 
+    <App
+      appConfig={appConfig}
       interviewToken={token || undefined}
       interviewDuration={booking?.slot?.duration_minutes || booking?.duration_minutes || 30}
       scheduledAt={booking?.scheduled_at}

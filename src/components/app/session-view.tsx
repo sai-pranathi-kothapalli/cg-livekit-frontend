@@ -8,6 +8,8 @@ import type { AppConfig } from '@/app-config';
 import { ChatTranscript } from '@/components/app/chat-transcript';
 import { PreConnectMessage } from '@/components/app/preconnect-message';
 import { TileLayout } from '@/components/app/tile-layout';
+import { analyzeCode } from '@/services/geminiCodeAnalysis';
+import { runCode } from '@/utils/codeRunner';
 import {
   AgentControlBar,
   type ControlBarControls,
@@ -16,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { debug } from '@/lib/debug';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
 import { RoomStatusBar } from '@/components/app/room-status-bar';
+import { VideoMonitor } from '@/components/interview/VideoMonitor';
+import { WarningBanner } from '@/components/interview/WarningBanner';
 
 const MotionBottom = motion.create('div');
 
@@ -97,8 +101,21 @@ export const SessionView = ({
   // Confirmation modal state
   const [showExitModal, setShowExitModal] = useState(false);
 
+  // Code Editor State
+  const [showCodeEditor, setShowCodeEditor] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState('');
+  const [codeLanguage, setCodeLanguage] = useState('python');
+
   // Manual transcript messages state (for messages not picked up by useSessionMessages)
   const [manualTranscriptMessages, setManualTranscriptMessages] = useState<ReceivedMessage[]>([]);
+
+  // Monitoring State
+  const [warningState, setWarningState] = useState<{
+    show: boolean;
+    severity: 'warning' | 'error' | 'critical';
+    message: string;
+    countdown?: number;
+  } | null>(null);
 
   // Merge regular messages with manually captured transcript messages, removing duplicates
   // Deduplicate based on message content, timestamp, and origin (within 2 seconds)
@@ -173,22 +190,28 @@ export const SessionView = ({
       }
     });
 
-    // Sort result by timestamp to maintain order
-    result.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    // Final deduplication by content hash and rough timestamp to handle cross-bucket edge cases
+    const uniqueMessages = new Map<string, ReceivedMessage>();
 
-    // Deduplicate local (user) messages by exact content so same transcript doesn't appear twice
-    const seenLocalContent = new Set<string>();
-    const deduped = result.filter(m => {
-      if (m.from?.isLocal) {
-        const content = (m.message || '').trim();
-        if (!content) return true;
-        if (seenLocalContent.has(content)) return false;
-        seenLocalContent.add(content);
+    result.forEach(msg => {
+      const content = (msg.message || '').trim();
+      const origin = msg.from?.isLocal ? 'local' : 'remote';
+      // Bucket by 3 seconds for final safety
+      const timeBucket = Math.floor((msg.timestamp || 0) / 3000);
+      const key = `${origin}-${timeBucket}-${content}`;
+
+      if (!uniqueMessages.has(key)) {
+        uniqueMessages.set(key, msg);
+      } else {
+        const existing = uniqueMessages.get(key)!;
+        // Keep the one with the more "official" ID (if one looks like my manual transcript ID)
+        if (existing.id.startsWith('transcript-') && !msg.id.startsWith('transcript-')) {
+          uniqueMessages.set(key, msg);
+        }
       }
-      return true;
     });
 
-    return deduped;
+    return Array.from(uniqueMessages.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
   }, [messages, manualTranscriptMessages]);
 
   // DEBUG: Log all messages to verify reception
@@ -239,6 +262,12 @@ export const SessionView = ({
   const streamingIntervals = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const completedMessageIds = useRef<Set<string>>(new Set());
   const streamingMessageIds = useRef<Set<string>>(new Set());
+  const allMessagesRef = useRef<ReceivedMessage[]>([]);
+
+  // Keep ref in sync for event handlers
+  useEffect(() => {
+    allMessagesRef.current = allMessages;
+  }, [allMessages]);
 
   // Check if there are pending agent messages (not yet displayed)
   const hasPendingAgentMessage = allMessages.some(msg => {
@@ -387,16 +416,6 @@ export const SessionView = ({
     return () => clearInterval(interval);
   }, [interviewStartTime, interviewDuration, isInterviewCompleted]);
 
-  // Format time remaining for display
-  const formatTimeRemaining = (minutes: number | null): string => {
-    if (minutes === null) return '--:--';
-    if (minutes <= 0) return '00:00';
-
-    const totalSeconds = Math.floor(minutes * 60);
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
 
   // Expose room info via console command
   useEffect(() => {
@@ -640,7 +659,7 @@ export const SessionView = ({
     return () => {
       delete (window as any).getRoomInfo;
     };
-  }, [session.room, messages]); // Include messages in dependencies so handler has latest value
+  }, [session.room]); // Removed messages from dependencies
 
   const controls: ControlBarControls = {
     leave: true,
@@ -655,6 +674,7 @@ export const SessionView = ({
     debug.log('🔄 Processing messages for display:', allMessages.length);
     allMessages.forEach((msg, idx) => {
       const isAgentMessage = !msg.from?.isLocal;
+
       debug.log(`📝 Processing message ${idx}:`, {
         id: msg.id,
         isAgentMessage,
@@ -920,6 +940,99 @@ export const SessionView = ({
     };
   }, []);
 
+  // AI-Powered Code Editor Detection Logic
+  useEffect(() => {
+    const lastAgentMessage = [...allMessages]
+      .reverse()
+      .find(msg => !msg.from?.isLocal && msg.message);
+
+    if (lastAgentMessage?.message) {
+      const text = lastAgentMessage.message.toLowerCase();
+      const keywords = [
+        "write code",
+        "implement",
+        "solve this problem",
+        "write a function",
+        "code this",
+        "coding challenge",
+        "reverse a string",
+        "palindrome",
+        "algorithm",
+        "data structure",
+        "fizzbuzz",
+        "two sum"
+      ];
+
+      const isCodingQuestion = keywords.some(keyword => text.includes(keyword));
+
+      if (isCodingQuestion && !showCodeEditor) {
+        debug.log('🎯 Coding question detected! Opening Code Editor.');
+        setCurrentQuestion(lastAgentMessage.message);
+        setShowCodeEditor(true);
+
+        // Auto-detect language if possible
+        if (text.includes('javascript') || text.includes('js')) setCodeLanguage('javascript');
+        else if (text.includes('python')) setCodeLanguage('python');
+        else if (text.includes('java')) setCodeLanguage('java');
+        else if (text.includes('c++') || text.includes('cpp')) setCodeLanguage('cpp');
+      }
+    }
+  }, [allMessages, showCodeEditor]);
+
+  const handleRunCode = async (code: string, language: string) => {
+    debug.log('🏃 Running code in browser...');
+    return await runCode(code, language);
+  };
+
+  const handleSubmitCode = async (code: string, executionOutput?: string) => {
+    debug.log('📤 Submitting code for AI analysis...');
+
+    // 1. Analyze with Gemini for immediate conversational context
+    const analysisResponse = await analyzeCode(currentQuestion, code, codeLanguage);
+
+    // 2. Add a subtle "Code submitted" indicator to transcript instead of raw analysis
+    const submissionIndicator: ReceivedMessage = {
+      id: `submission-${Date.now()}`,
+      timestamp: Date.now(),
+      message: `✅ **Code submitted for review**`,
+      from: {
+        identity: 'System',
+        name: 'System',
+        isLocal: true,
+      } as any,
+      type: 'chatMessage',
+    };
+    setManualTranscriptMessages(prev => [...prev, submissionIndicator]);
+
+    // 3. Send message to AI agent via LiveKit data channel
+    const room = session.room;
+    if (room && room.localParticipant) {
+      const analysisMessage = {
+        type: 'code_submission',
+        question: currentQuestion,
+        code: code,
+        language: codeLanguage,
+        executionOutput: executionOutput || 'No output recorded',
+        aiAnalysis: analysisResponse,
+        timestamp: Date.now()
+      };
+
+      try {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(JSON.stringify(analysisMessage));
+        await room.localParticipant.publishData(data, {
+          reliable: true,
+          topic: 'code-submission'
+        });
+        debug.log('📡 Code submission sent to AI agent.');
+      } catch (err) {
+        debug.error('❌ Failed to send code submission to agent:', err);
+      }
+    } else {
+      debug.warn('⚠️ Cannot send code submission: Room not connected or local participant missing');
+    }
+  };
+
   useEffect(() => {
     debug.log('📺 Streaming messages state:', {
       count: streamingMessages.length,
@@ -941,24 +1054,55 @@ export const SessionView = ({
     });
 
     // Auto-scroll when new messages arrive
-    const lastMessage = streamingMessages.at(-1);
-    const lastMessageIsLocal = lastMessage?.messageOrigin === 'local';
-
-    if (scrollAreaRef.current && lastMessageIsLocal) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    if (scrollAreaRef.current) {
+      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollContainer) {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+      }
     }
-  }, [streamingMessages, chatOpen]);
+  }, [allMessages, chatOpen, streamingMessages.length]);
+
+  const handleInterviewTerminated = (reason: string) => {
+    debug.error('🚫 Interview Terminated:', reason);
+    setIsInterviewCompleted(true);
+    // You could redirect or show a critical error modal here
+    alert(`Interview terminated: ${reason}`);
+    window.location.href = '/';
+  };
 
   return (
     <section className="bg-background relative z-10 h-screen w-full overflow-hidden flex flex-col" {...props}>
       {/* Room Status Bar with Timer */}
       <RoomStatusBar timeRemaining={timeRemaining} />
 
+      {/* Video Monitoring & Alerts */}
+      <VideoMonitor
+        onInterviewTerminated={handleInterviewTerminated}
+        onWarningStateChange={setWarningState}
+      />
+
+      {warningState?.show && (
+        <WarningBanner
+          severity={warningState.severity}
+          message={warningState.message}
+          countdown={warningState.countdown}
+        />
+      )}
+
       {/* Main Content Area: Videos on left, Transcript on right (Google Meet style) */}
       <div className="flex-1 flex flex-row min-h-0 gap-4 pt-14 pb-20 px-4 md:px-6">
         {/* Left Side: Videos Section */}
         <div className="flex-1 flex flex-col min-w-0">
-          <TileLayout chatOpen={chatOpen} />
+          <TileLayout
+            showCodeEditor={showCodeEditor}
+            codeEditorProps={{
+              language: codeLanguage,
+              initialCode: codeLanguage === 'python' ? 'def solution():\n    # Write your code here\n    pass' : '// Write your code here',
+              question: currentQuestion,
+              onCodeSubmit: handleSubmitCode,
+              onRunCode: handleRunCode,
+            }}
+          />
         </div>
 
         {/* Right Side: Transcript Panel */}

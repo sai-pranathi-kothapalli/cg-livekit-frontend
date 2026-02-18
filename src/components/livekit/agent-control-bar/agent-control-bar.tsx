@@ -1,10 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { type HTMLAttributes, useCallback, useState } from 'react';
+import { type HTMLAttributes, useCallback } from 'react';
 import { Track } from 'livekit-client';
 // import { useChat, useRemoteParticipants } from '@livekit/components-react';
-import { useRemoteParticipants } from '@livekit/components-react';
 import { PhoneDisconnectIcon } from '@phosphor-icons/react/dist/ssr';
 // import { ChatTextIcon } from '@phosphor-icons/react/dist/ssr';
 import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle';
@@ -49,10 +48,9 @@ export function AgentControlBar({
   ...props
 }: AgentControlBarProps & HTMLAttributes<HTMLDivElement>) {
   // const { send } = useChat(); // Commented out - chat not used for now
-  const participants = useRemoteParticipants();
   // const [internalChatOpen, setInternalChatOpen] = useState(false); // Commented out - chat not used for now
   const publishPermissions = usePublishPermissions();
-  
+
   // Enhanced error handler with logging and user-friendly messages
   const handleDeviceError = useCallback((error: { source: Track.Source; error: Error }) => {
     debug.error('[AgentControlBar] Device error:', {
@@ -61,56 +59,56 @@ export function AgentControlBar({
       message: error.error.message,
       stack: error.error.stack,
     });
-    
+
     const errorMessage = error.error.message || '';
     const errorName = error.error.name || '';
-    const deviceName = error.source === Track.Source.Microphone ? 'microphone' : 
-                      error.source === Track.Source.Camera ? 'camera' : 
-                      error.source === Track.Source.ScreenShare ? 'screen' : 'device';
-    
+    const deviceName = error.source === Track.Source.Microphone ? 'microphone' :
+      error.source === Track.Source.Camera ? 'camera' :
+        error.source === Track.Source.ScreenShare ? 'screen' : 'device';
+
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    const isSecureContext = window.isSecureContext;
-    
+
+
     // Check for different error types
-    const isGetUserMediaUndefined = errorMessage.includes('getUserMedia') || 
-                                     errorMessage.includes('Cannot read properties of undefined');
-    const isNoDeviceFound = errorMessage.includes('NotFoundError') || 
-                            errorMessage.includes('No video input devices found') ||
-                            errorMessage.includes('No audio input devices found') ||
-                            errorMessage.includes('could not be found') ||
-                            errorName === 'NotFoundError';
-    const isPermissionDenied = errorMessage.includes('PermissionDeniedError') || 
-                              errorMessage.includes('Permission denied') ||
-                              errorMessage.includes('NotAllowedError') ||
-                              errorName === 'NotAllowedError' ||
-                              errorName === 'PermissionDeniedError';
+    const isGetUserMediaUndefined = errorMessage.includes('getUserMedia') ||
+      errorMessage.includes('Cannot read properties of undefined');
+    const isNoDeviceFound = errorMessage.includes('NotFoundError') ||
+      errorMessage.includes('No video input devices found') ||
+      errorMessage.includes('No audio input devices found') ||
+      errorMessage.includes('could not be found') ||
+      errorName === 'NotFoundError';
+    const isPermissionDenied = errorMessage.includes('PermissionDeniedError') ||
+      errorMessage.includes('Permission denied') ||
+      errorMessage.includes('NotAllowedError') ||
+      errorName === 'NotAllowedError' ||
+      errorName === 'PermissionDeniedError';
     const isDeviceInUse = errorMessage.includes('DevicesInUse') ||
-                          errorMessage.includes('device is already in use');
-    
+      errorMessage.includes('device is already in use');
+
     let title = `Cannot access ${deviceName}`;
     let description: React.ReactNode = null;
-    
+
     if (isGetUserMediaUndefined && protocol === 'http:' && !isLocalhost) {
       // HTTP vs HTTPS issue
       title = `HTTPS Required for ${deviceName}`;
       description = (
         <>
-            <p className="w-full text-xs">
-              Browser security requires <strong>HTTPS</strong> or <strong>localhost</strong> to access your {deviceName}.
-              <br />
-              <br />
-              Current URL: <code className="text-xs bg-muted px-1 py-0.5 rounded">{protocol}//{hostname}</code>
-              <br />
-              <br />
-              <strong>Solutions:</strong>
-              <ul className="list-inside list-disc mt-1.5 space-y-0.5 text-xs">
-                <li>Access via <code className="text-xs bg-muted px-1 py-0.5 rounded">localhost</code> instead of IP address</li>
-                <li>Set up HTTPS for production use</li>
-                <li>Use a reverse proxy with SSL certificate</li>
-              </ul>
-            </p>
+          <p className="w-full text-xs">
+            Browser security requires <strong>HTTPS</strong> or <strong>localhost</strong> to access your {deviceName}.
+            <br />
+            <br />
+            Current URL: <code className="text-xs bg-muted px-1 py-0.5 rounded">{protocol}//{hostname}</code>
+            <br />
+            <br />
+            <strong>Solutions:</strong>
+            <ul className="list-inside list-disc mt-1.5 space-y-0.5 text-xs">
+              <li>Access via <code className="text-xs bg-muted px-1 py-0.5 rounded">localhost</code> instead of IP address</li>
+              <li>Set up HTTPS for production use</li>
+              <li>Use a reverse proxy with SSL certificate</li>
+            </ul>
+          </p>
         </>
       );
     } else if (isNoDeviceFound) {
@@ -207,16 +205,16 @@ export function AgentControlBar({
         </>
       );
     }
-    
+
     // Show user-friendly toast notification
     toastAlert({
       title,
       description,
     });
-    
+
     onDeviceError?.(error);
   }, [onDeviceError]);
-  
+
   const {
     micTrackRef,
     cameraToggle,
@@ -227,14 +225,14 @@ export function AgentControlBar({
     handleMicrophoneDeviceSelectError,
     handleCameraDeviceSelectError,
   } = useInputControls({ onDeviceError: handleDeviceError, saveUserChoices });
-  
+
   // Check for HTTP/HTTPS issue proactively
   React.useEffect(() => {
     const protocol = window.location.protocol;
     const hostname = window.location.hostname;
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const hasMediaDevices = typeof navigator !== 'undefined' && !!navigator.mediaDevices;
-    
+
     if (protocol === 'http:' && !isLocalhost && !hasMediaDevices) {
       debug.warn('[AgentControlBar] ⚠️ Media devices unavailable due to HTTP (non-localhost):', {
         protocol,
@@ -244,7 +242,7 @@ export function AgentControlBar({
       });
     }
   }, []);
-  
+
   // Debug logging
   React.useEffect(() => {
     debug.log('[AgentControlBar] State:', {
@@ -287,7 +285,7 @@ export function AgentControlBar({
     chat: controls?.chat ?? publishPermissions.data,
   };
 
-  const isAgentAvailable = participants.some((p) => p.isAgent);
+
 
   return (
     <div

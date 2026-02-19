@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import { Play, Send, ChevronDown, Terminal, Code2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/livekit/button';
+import type { Room } from 'livekit-client';
+import { debug } from '@/lib/debug';
 
 interface CodeEditorProps {
     language: string;
@@ -10,13 +12,15 @@ interface CodeEditorProps {
     question: string;
     onCodeSubmit: (code: string, output?: string) => void;
     onRunCode: (code: string, language: string) => Promise<{ output: string; error?: string }>;
+    room?: Room;
 }
 
 const LANGUAGES = [
     { label: 'Python', value: 'python' },
-    { label: 'JavaScript', value: 'javascript' },
     { label: 'Java', value: 'java' },
+    { label: 'C', value: 'c' },
     { label: 'C++', value: 'cpp' },
+    { label: 'SQL', value: 'sql' },
 ];
 
 export function CodeEditor({
@@ -24,7 +28,8 @@ export function CodeEditor({
     initialCode = '',
     question,
     onCodeSubmit,
-    onRunCode
+    onRunCode,
+    room
 }: CodeEditorProps) {
     const [code, setCode] = useState(initialCode);
     const [language, setLanguage] = useState(initialLanguage);
@@ -33,10 +38,146 @@ export function CodeEditor({
     const [isExecuting, setIsExecuting] = useState(false);
     const editorRef = useRef<any>(null);
 
+    // Typing detection and timers
+    const lastTypingTimeRef = useRef<number>(Date.now());
+    const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const lastSnapshotCodeRef = useRef<string>('');
+    const lastSnapshotTimeRef = useRef<number>(0);
+
     const handleEditorDidMount: OnMount = (editor) => {
         editorRef.current = editor;
         editor.focus();
     };
+
+    // Send code snapshot to AI agent
+    const sendCodeSnapshot = useCallback(async (currentCode: string) => {
+        if (!room?.localParticipant || currentCode === lastSnapshotCodeRef.current) {
+            return; // Don't send if unchanged
+        }
+
+        lastSnapshotCodeRef.current = currentCode;
+        lastSnapshotTimeRef.current = Date.now();
+
+        try {
+            const snapshotMessage = {
+                type: 'code_snapshot',
+                question: question,
+                code: currentCode,
+                language: language,
+                timestamp: Date.now()
+            };
+
+            const encoder = new TextEncoder();
+            const data = encoder.encode(JSON.stringify(snapshotMessage));
+            await room.localParticipant.publishData(data, {
+                reliable: true,
+                topic: 'code-snapshot'
+            });
+            debug.log('📸 Code snapshot sent to AI agent (15s typing interval)');
+        } catch (err) {
+            debug.error('❌ Failed to send code snapshot:', err);
+        }
+    }, [room, question, language]);
+
+    // Send idle prompt to AI agent
+    const sendIdlePrompt = useCallback(async () => {
+        if (!room?.localParticipant) return;
+
+        try {
+            const idleMessage = {
+                type: 'code_idle',
+                question: question,
+                code: code,
+                language: language,
+                timestamp: Date.now()
+            };
+
+            const encoder = new TextEncoder();
+            const data = encoder.encode(JSON.stringify(idleMessage));
+            await room.localParticipant.publishData(data, {
+                reliable: true,
+                topic: 'code-idle'
+            });
+            debug.log('⏸️ Code idle prompt sent to AI agent (1min no typing)');
+        } catch (err) {
+            debug.error('❌ Failed to send idle prompt:', err);
+        }
+    }, [room, question, code, language]);
+
+    // Handle code changes with typing detection
+    const handleCodeChange = useCallback((newCode: string | undefined) => {
+        const currentCode = newCode || '';
+        setCode(currentCode);
+        
+        const now = Date.now();
+        lastTypingTimeRef.current = now;
+
+        // Clear existing idle timer (user is typing, so reset idle countdown)
+        if (idleTimerRef.current) {
+            clearTimeout(idleTimerRef.current);
+            idleTimerRef.current = null;
+        }
+
+        // Start/restart snapshot interval (every 15s while typing)
+        if (currentCode.trim().length > 0) {
+            // Clear existing interval
+            if (snapshotIntervalRef.current) {
+                clearInterval(snapshotIntervalRef.current);
+            }
+
+            // Set up interval to send snapshots every 15s while typing
+            snapshotIntervalRef.current = setInterval(() => {
+                const timeSinceLastTyping = Date.now() - lastTypingTimeRef.current;
+                // Only send if user typed recently (within 3s) - means they're actively typing
+                if (timeSinceLastTyping < 3000) {
+                    const currentCodeValue = editorRef.current?.getValue() || code;
+                    if (currentCodeValue.trim().length > 0) {
+                        sendCodeSnapshot(currentCodeValue);
+                    }
+                } else {
+                    // User stopped typing, clear interval
+                    if (snapshotIntervalRef.current) {
+                        clearInterval(snapshotIntervalRef.current);
+                        snapshotIntervalRef.current = null;
+                    }
+                }
+            }, 15000); // Every 15 seconds
+
+            // Send first snapshot if enough time has passed since last one
+            const timeSinceLastSnapshot = now - lastSnapshotTimeRef.current;
+            if (timeSinceLastSnapshot >= 15000 && currentCode.trim().length > 0) {
+                sendCodeSnapshot(currentCode);
+            }
+        } else {
+            // Code is empty, clear snapshot interval
+            if (snapshotIntervalRef.current) {
+                clearInterval(snapshotIntervalRef.current);
+                snapshotIntervalRef.current = null;
+            }
+        }
+
+        // Set idle timer to trigger after 1 minute of NO typing
+        idleTimerRef.current = setTimeout(() => {
+            const timeSinceLastTyping = Date.now() - lastTypingTimeRef.current;
+            // Only send idle prompt if user hasn't typed for 1 minute and code exists
+            if (timeSinceLastTyping >= 60000 && currentCode.trim().length > 0) {
+                sendIdlePrompt();
+            }
+        }, 60000); // 1 minute
+    }, [sendCodeSnapshot, sendIdlePrompt]);
+
+    // Cleanup timers on unmount
+    useEffect(() => {
+        return () => {
+            if (snapshotIntervalRef.current) {
+                clearInterval(snapshotIntervalRef.current);
+            }
+            if (idleTimerRef.current) {
+                clearTimeout(idleTimerRef.current);
+            }
+        };
+    }, []);
 
     const handleRun = async () => {
         setIsExecuting(true);
@@ -120,7 +261,7 @@ export function CodeEditor({
                     language={language === 'cpp' ? 'cpp' : language}
                     value={code}
                     theme="vs-dark"
-                    onChange={(val) => setCode(val || '')}
+                    onChange={handleCodeChange}
                     onMount={handleEditorDidMount}
                     options={{
                         fontSize: 14,

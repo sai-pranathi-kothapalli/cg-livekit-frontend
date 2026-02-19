@@ -158,45 +158,9 @@ export function VideoMonitor({ onWarning, onInterviewTerminated, onStateUpdate, 
             const s = stateRef.current;
             const newWarnings: Warning[] = [];
 
-            // 1. Camera Status & Face Detection logic
-            const isTrackMuted = isMuted || !hasTrack;
-            const isStrictlyCameraOff = isTrackMuted || !s.faceDetected;
+            // Camera check removed - users can continue interview without camera
 
-            if (isStrictlyCameraOff) {
-                if (!cameraOffStart.current) {
-                    debug.log('⚠️ [VideoMonitor] Camera/Face loss detected, starting timer...');
-                    cameraOffStart.current = now;
-                }
-                const duration = (now - cameraOffStart.current) / 1000;
-
-                if (duration >= 20) {
-                    onInterviewTerminated?.('Camera remained off for more than 20 seconds.');
-                } else if (duration >= 5) {
-                    const countdown = Math.ceil(20 - duration);
-
-                    // Determine specific reason for warning
-                    const reason = isTrackMuted
-                        ? 'Your camera is turned off'
-                        : 'No face detected - camera may be covered';
-
-                    setWarningState({
-                        show: true,
-                        severity: 'critical',
-                        message: `🚨 ${reason.toUpperCase()}`,
-                        countdown: countdown > 0 ? countdown : 0
-                    });
-                    addUniqueWarning(newWarnings, 'camera', 'red', `🚨 ${reason.toUpperCase()}. Interview ends in ${countdown}s`);
-                }
-            } else {
-                if (cameraOffStart.current) {
-                    debug.log('✅ [VideoMonitor] Camera/Face restored.');
-                    cameraOffStart.current = null;
-                    setWarningState(null); // Clear warnings immediately
-                    activeWarningTypes.current.clear(); // Clear all tracked warning types for a fresh start
-                }
-            }
-
-            // 2. Multiple People Detection
+            // 1. Multiple People Detection
             if (s.faceCount > 1) {
                 addUniqueWarning(newWarnings, 'multiple_people', 'orange', 'Multiple people detected. Only you should be visible.');
                 sendAlertToAgent('multiple_people_detected', { count: s.faceCount });

@@ -4,11 +4,11 @@ import * as React from 'react';
 import { type HTMLAttributes, useCallback } from 'react';
 import { Track } from 'livekit-client';
 // import { useChat, useRemoteParticipants } from '@livekit/components-react';
-import { PhoneDisconnectIcon } from '@phosphor-icons/react/dist/ssr';
+import { PhoneDisconnectIcon, Code } from '@phosphor-icons/react/dist/ssr';
 // import { ChatTextIcon } from '@phosphor-icons/react/dist/ssr';
 import { TrackToggle } from '@/components/livekit/agent-control-bar/track-toggle';
 import { Button } from '@/components/livekit/button';
-// import { Toggle } from '@/components/livekit/toggle';
+import { Toggle } from '@/components/livekit/toggle';
 import { cn } from '@/lib/utils';
 import { debug } from '@/lib/debug';
 // import { ChatInput } from './chat-input';
@@ -23,6 +23,7 @@ export interface ControlBarControls {
   microphone?: boolean;
   screenShare?: boolean;
   chat?: boolean;
+  compiler?: boolean;
 }
 
 export interface AgentControlBarProps extends UseInputControlsProps {
@@ -31,6 +32,8 @@ export interface AgentControlBarProps extends UseInputControlsProps {
   chatOpen?: boolean;
   onChatOpenChange?: (open: boolean) => void;
   onDeviceError?: (error: { source: Track.Source; error: Error }) => void;
+  compilerOpen?: boolean;
+  onCompilerOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -45,6 +48,8 @@ export function AgentControlBar({
   onDisconnect,
   onDeviceError,
   onChatOpenChange,
+  compilerOpen = false,
+  onCompilerOpenChange,
   ...props
 }: AgentControlBarProps & HTMLAttributes<HTMLDivElement>) {
   // const { send } = useChat(); // Commented out - chat not used for now
@@ -283,6 +288,7 @@ export function AgentControlBar({
     screenShare: controls?.screenShare ?? publishPermissions.screenShare,
     camera: controls?.camera ?? publishPermissions.camera,
     chat: controls?.chat ?? publishPermissions.data,
+    compiler: controls?.compiler ?? true,
   };
 
 
@@ -369,6 +375,27 @@ export function AgentControlBar({
                 }
               }}
             />
+          )}
+
+          {/* Toggle Compiler */}
+          {visibleControls.compiler && (
+            <Toggle
+              size="icon"
+              variant="secondary"
+              aria-label="Toggle code compiler"
+              pressed={compilerOpen}
+              disabled={!isConnected}
+              onPressedChange={(pressed) => {
+                debug.log('[AgentControlBar] Compiler button clicked:', { pressed, isConnected });
+                if (isConnected) {
+                  onCompilerOpenChange?.(pressed);
+                } else {
+                  debug.warn('[AgentControlBar] Compiler toggle blocked: not connected');
+                }
+              }}
+            >
+              <Code weight="bold" />
+            </Toggle>
           )}
 
           {/* Toggle Transcript - Commented out for now */}

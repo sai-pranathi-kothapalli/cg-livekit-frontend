@@ -13,7 +13,7 @@ import {
     Warning,
     Play
 } from '@phosphor-icons/react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { debug } from '@/lib/debug';
 
@@ -216,11 +216,11 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
     }, []);
 
     const allPassed =
-        cameraStatus === 'success' &&
         micStatus === 'success' &&
         screenShareStatus === 'success' &&
         (speedStatus === 'success' || speedStatus === 'warning') &&
         audioOutputStatus === 'success';
+        // Camera check removed - users can continue without camera
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-100 font-sans">

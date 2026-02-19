@@ -667,6 +667,7 @@ export const SessionView = ({
     chat: appConfig.supportsChatInput,
     camera: appConfig.supportsVideoInput,
     screenShare: appConfig.supportsVideoInput,
+    compiler: true,
   };
 
   // Handle streaming text display for agent messages
@@ -940,44 +941,7 @@ export const SessionView = ({
     };
   }, []);
 
-  // AI-Powered Code Editor Detection Logic
-  useEffect(() => {
-    const lastAgentMessage = [...allMessages]
-      .reverse()
-      .find(msg => !msg.from?.isLocal && msg.message);
-
-    if (lastAgentMessage?.message) {
-      const text = lastAgentMessage.message.toLowerCase();
-      const keywords = [
-        "write code",
-        "implement",
-        "solve this problem",
-        "write a function",
-        "code this",
-        "coding challenge",
-        "reverse a string",
-        "palindrome",
-        "algorithm",
-        "data structure",
-        "fizzbuzz",
-        "two sum"
-      ];
-
-      const isCodingQuestion = keywords.some(keyword => text.includes(keyword));
-
-      if (isCodingQuestion && !showCodeEditor) {
-        debug.log('🎯 Coding question detected! Opening Code Editor.');
-        setCurrentQuestion(lastAgentMessage.message);
-        setShowCodeEditor(true);
-
-        // Auto-detect language if possible
-        if (text.includes('javascript') || text.includes('js')) setCodeLanguage('javascript');
-        else if (text.includes('python')) setCodeLanguage('python');
-        else if (text.includes('java')) setCodeLanguage('java');
-        else if (text.includes('c++') || text.includes('cpp')) setCodeLanguage('cpp');
-      }
-    }
-  }, [allMessages, showCodeEditor]);
+  // Automatic keyword detection removed - compiler now opens manually via button
 
   const handleRunCode = async (code: string, language: string) => {
     debug.log('🏃 Running code in browser...');
@@ -1031,6 +995,12 @@ export const SessionView = ({
     } else {
       debug.warn('⚠️ Cannot send code submission: Room not connected or local participant missing');
     }
+
+    // 4. Auto-close compiler after submission
+    setTimeout(() => {
+      setShowCodeEditor(false);
+      debug.log('🔒 Compiler auto-closed after code submission.');
+    }, 500);
   };
 
   useEffect(() => {
@@ -1101,6 +1071,7 @@ export const SessionView = ({
               question: currentQuestion,
               onCodeSubmit: handleSubmitCode,
               onRunCode: handleRunCode,
+              room: session.room,
             }}
           />
         </div>
@@ -1167,6 +1138,25 @@ export const SessionView = ({
             controls={controls}
             isConnected={session.isConnected}
             onDisconnect={() => setShowExitModal(true)}
+            compilerOpen={showCodeEditor}
+            onCompilerOpenChange={(open) => {
+              setShowCodeEditor(open);
+              // When opening compiler, set current question from last agent message if available
+              if (open && !currentQuestion) {
+                const lastAgentMessage = [...allMessages]
+                  .reverse()
+                  .find(msg => !msg.from?.isLocal && msg.message);
+                if (lastAgentMessage?.message) {
+                  setCurrentQuestion(lastAgentMessage.message);
+                  // Auto-detect language if possible
+                  const text = lastAgentMessage.message.toLowerCase();
+                  if (text.includes('javascript') || text.includes('js')) setCodeLanguage('javascript');
+                  else if (text.includes('python')) setCodeLanguage('python');
+                  else if (text.includes('java')) setCodeLanguage('java');
+                  else if (text.includes('c++') || text.includes('cpp')) setCodeLanguage('cpp');
+                }
+              }
+            }}
           />
         </div>
       </MotionBottom>

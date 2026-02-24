@@ -18,8 +18,11 @@ import { cn } from '@/lib/utils';
 import { debug } from '@/lib/debug';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
 import { RoomStatusBar } from '@/components/app/room-status-bar';
+import { ThemeToggle } from '@/components/app/theme-toggle';
+import { SettingsPanel } from '@/components/pre-interview/SettingsPanel';
 import { VideoMonitor } from '@/components/interview/VideoMonitor';
 import { WarningBanner } from '@/components/interview/WarningBanner';
+import { Gear } from '@phosphor-icons/react';
 
 const MotionBottom = motion.create('div');
 
@@ -100,6 +103,7 @@ export const SessionView = ({
 
   // Confirmation modal state
   const [showExitModal, setShowExitModal] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Code Editor State
   const [showCodeEditor, setShowCodeEditor] = useState(false);
@@ -1044,6 +1048,19 @@ export const SessionView = ({
     <section className="bg-background relative z-10 h-screen w-full overflow-hidden flex flex-col" {...props}>
       {/* Room Status Bar with Timer */}
       <RoomStatusBar timeRemaining={timeRemaining} />
+      {/* Theme + Settings in session (top-right) */}
+      <div className="fixed top-2 right-4 z-[61] flex items-center gap-2">
+        <ThemeToggle className="w-auto rounded-full border border-input bg-background/95 backdrop-blur-sm" />
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-full border border-input bg-background/95 backdrop-blur-sm hover:bg-muted/50 text-foreground text-sm font-medium transition-colors"
+          aria-label="Device and network settings"
+        >
+          <Gear size={18} weight="bold" /> Settings
+        </button>
+      </div>
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
       {/* Video Monitoring & Alerts */}
       <VideoMonitor

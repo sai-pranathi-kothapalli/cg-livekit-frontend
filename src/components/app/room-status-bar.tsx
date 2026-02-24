@@ -243,30 +243,7 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
             </div>
           </div>
           
-          {/* Timer Display */}
-          {timeRemaining !== null && (
-            <div className="flex items-center gap-2 border-l border-input/50 pl-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Time Remaining</span>
-                <span className={`text-sm font-mono font-semibold ${
-                  timeRemaining <= 2 ? 'text-red-500' : 
-                  timeRemaining <= 5 ? 'text-orange-500' : 
-                  'text-foreground'
-                }`}>
-                  {(() => {
-                    if (timeRemaining <= 0) return '00:00';
-                    const totalSeconds = Math.floor(timeRemaining * 60);
-                    const mins = Math.floor(totalSeconds / 60);
-                    const secs = totalSeconds % 60;
-                    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-                  })()}
-                </span>
-              </div>
-              {timeRemaining <= 2 && (
-                <div className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-              )}
-            </div>
-          )}
+          {/* Timer hidden from candidate — time remaining not shown to user */}
           
           {/* Agent Health Status */}
           {isLiveKitConnected && (

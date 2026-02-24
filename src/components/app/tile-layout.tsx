@@ -173,9 +173,9 @@ export function TileLayout({
             "grid gap-4 h-full transition-all duration-700 ease-in-out",
             showCodeEditor ? "grid-cols-[30%_70%]" : "grid-cols-[1fr_1fr]"
           )}>
-            {/* Column 1: Videos */}
+            {/* Column 1: Videos — same size as candidate (aspect-video) */}
             <div className="flex flex-col gap-4 min-w-0">
-              {/* Interviewer Video */}
+              {/* Interviewer Video — same size as user's camera tile */}
               <div className={cn(
                 "flex items-center justify-center transition-all duration-500",
                 showCodeEditor ? "h-1/2" : "h-full"
@@ -189,7 +189,7 @@ export function TileLayout({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
                       transition={ANIMATION_TRANSITION}
-                      className="w-full h-full rounded-lg border border-input/40 drop-shadow-2xl overflow-hidden bg-black"
+                      className="w-full aspect-video max-h-full rounded-lg border border-input/40 drop-shadow-2xl overflow-hidden bg-black"
                     >
                       <InterviewerAvatar
                         agentAudioTrack={agentAudioTrack}
@@ -206,7 +206,7 @@ export function TileLayout({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={ANIMATION_TRANSITION}
-                      className="relative w-full h-full rounded-lg overflow-hidden bg-black drop-shadow-xl border border-input/50"
+                      className="relative w-full aspect-video max-h-full rounded-lg overflow-hidden bg-black drop-shadow-xl border border-input/50"
                     >
                       <VideoTrack
                         width={videoWidth}
@@ -278,7 +278,7 @@ export function TileLayout({
                 <CodeEditor {...codeEditorProps!} />
               </div>
             ) : (
-              /* Regular Side-by-Side: Candidate in Col 2 */
+              /* Regular Side-by-Side: Candidate in Col 2 — same size as interviewer */
               <div className="flex items-center justify-center h-full">
                 <AnimatePresence mode="wait">
                   {isCameraEnabled && cameraTrack && (
@@ -289,7 +289,7 @@ export function TileLayout({
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={ANIMATION_TRANSITION}
-                      className="relative w-full aspect-video rounded-lg overflow-hidden bg-black drop-shadow-xl border border-input/50"
+                      className="relative w-full aspect-video max-h-full rounded-lg overflow-hidden bg-black drop-shadow-xl border border-input/50"
                     >
                       <VideoTrack
                         trackRef={cameraTrack}
@@ -311,7 +311,7 @@ export function TileLayout({
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={ANIMATION_TRANSITION}
-                      className={cn("w-full aspect-video rounded-lg border border-input/50 flex items-center justify-center overflow-hidden", avatarColor)}
+                      className={cn("w-full aspect-video max-h-full rounded-lg border border-input/50 flex items-center justify-center overflow-hidden", avatarColor)}
                     >
                       <div className="flex flex-col items-center gap-4">
                         <div className="w-32 h-32 rounded-full bg-white/20 flex items-center justify-center shadow-lg backdrop-blur-sm">

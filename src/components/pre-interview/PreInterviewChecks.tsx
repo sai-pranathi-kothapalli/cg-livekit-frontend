@@ -11,11 +11,14 @@ import {
     XCircle,
     CircleNotch,
     Warning,
-    Play
+    Play,
+    Gear
 } from '@phosphor-icons/react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 import { debug } from '@/lib/debug';
+import { ThemeToggle } from '@/components/app/theme-toggle';
+import { SettingsPanel } from './SettingsPanel';
 
 type CheckStatus = 'idle' | 'loading' | 'success' | 'failure' | 'warning';
 
@@ -83,6 +86,7 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
     const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
     const [micLevel, setMicLevel] = useState(0);
     const [downloadSpeed, setDownloadSpeed] = useState<number | null>(null);
+    const [settingsOpen, setSettingsOpen] = useState(false);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
@@ -149,12 +153,21 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
         }
     };
 
-    // 3. Screen Share Check
-    const checkScreenShare = () => {
+    // 3. Screen Share — mandatory: user must grant screen share before starting
+    const hasScreenShareAPI = !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+
+    const grantScreenShare = async () => {
+        if (!hasScreenShareAPI) {
+            setScreenShareStatus('failure');
+            return;
+        }
         setScreenShareStatus('loading');
-        if (navigator.mediaDevices && !!navigator.mediaDevices.getDisplayMedia) {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+            stream.getTracks().forEach((t) => t.stop());
             setScreenShareStatus('success');
-        } else {
+        } catch (err) {
+            debug.error('Screen share denied or cancelled:', err);
             setScreenShareStatus('failure');
         }
     };
@@ -202,11 +215,11 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
         setAudioOutputStatus(heard ? 'success' : 'failure');
     };
 
-    // Run initial checks (except manual ones)
+    // Run initial checks (except manual ones). Screen share requires user to grant — not auto-set.
     useEffect(() => {
         checkCamera();
         checkMic();
-        checkScreenShare();
+        if (!hasScreenShareAPI) setScreenShareStatus('failure');
         checkSpeed();
 
         return () => {
@@ -223,7 +236,22 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
         // Camera check removed - users can continue without camera
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-slate-100 font-sans">
+        <div className="min-h-screen bg-slate-950 flex flex-col text-slate-100 font-sans">
+            {/* Top bar: Theme toggle + Settings */}
+            <div className="flex items-center justify-end gap-3 p-4 border-b border-slate-800/80 shrink-0">
+                <ThemeToggle className="w-auto rounded-full border-slate-700" />
+                <button
+                    type="button"
+                    onClick={() => setSettingsOpen(true)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-full border border-slate-700 bg-slate-800/60 hover:bg-slate-800 text-slate-200 text-sm font-medium transition-colors"
+                    aria-label="Open device and network settings"
+                >
+                    <Gear size={18} weight="bold" /> Settings
+                </button>
+            </div>
+            <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+            <div className="flex-1 flex items-center justify-center p-6">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -294,13 +322,38 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
                             status={micStatus}
                             description={micStatus === 'failure' ? 'Please allow mic access in browser' : 'Detecting your voice'}
                         />
-                        <CheckItem
-                            id="screen"
-                            icon={Monitor}
-                            label="Screen Sharing"
-                            status={screenShareStatus}
-                            description="Browser support for screen share"
-                        />
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-800/40 border border-slate-700/50 backdrop-blur-sm transition-all hover:bg-slate-800/60">
+                            <div className="flex items-center gap-4">
+                                <div className={cn(
+                                    "p-2.5 rounded-lg",
+                                    screenShareStatus === 'success' ? "bg-green-500/10 text-green-400" :
+                                        screenShareStatus === 'failure' ? "bg-red-500/10 text-red-400" :
+                                            "bg-slate-700/50 text-slate-300"
+                                )}>
+                                    <Monitor size={24} weight="bold" />
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-slate-100">Screen Sharing (required)</p>
+                                    <p className="text-xs text-slate-400 mt-0.5">
+                                        {screenShareStatus === 'success' ? 'Screen share granted' : 'Grant screen share to continue'}
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                {screenShareStatus === 'loading' && <CircleNotch className="h-6 w-6 animate-spin text-blue-400" />}
+                                {screenShareStatus === 'success' && <CheckCircle weight="fill" className="h-6 w-6 text-green-500" />}
+                                {(screenShareStatus === 'idle' || screenShareStatus === 'failure') && hasScreenShareAPI && (
+                                    <button
+                                        type="button"
+                                        onClick={grantScreenShare}
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold transition-all"
+                                    >
+                                        Grant screen share
+                                    </button>
+                                )}
+                                {screenShareStatus === 'failure' && !hasScreenShareAPI && <XCircle weight="fill" className="h-6 w-6 text-red-500" />}
+                            </div>
+                        </div>
                         <CheckItem
                             id="speed"
                             icon={WifiHigh}
@@ -416,6 +469,7 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
           transform: scaleX(-1);
         }
       `}</style>
+            </div>
         </div>
     );
 }

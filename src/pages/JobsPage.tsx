@@ -9,23 +9,23 @@ export default function JobsPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         <section className="w-full max-w-3xl space-y-4">
           <h1 className="text-3xl font-bold tracking-tight">
-            Regional Rural Bank Probationary Officer (PO)
+            Interview Opportunity
           </h1>
           <p className="text-sm text-muted-foreground">Codegnan Team</p>
           <p>
-            We are conducting interviews for the Regional Rural Bank Probationary Officer (PO) position.
-            This is an excellent opportunity to build a career in the banking sector and serve rural communities
-            through financial inclusion and banking services.
+            We are conducting interviews for qualified candidates.
+            This is an excellent opportunity to demonstrate your skills,
+            experience, and suitability for the role.
           </p>
         </section>
 
         <section className="w-full max-w-3xl space-y-3">
           <h2 className="text-xl font-semibold">Interview Preparation Areas</h2>
           <ul className="list-disc space-y-1 pl-6 text-sm">
-            <li><strong>Candidate Personal Introduction:</strong> Your background, education, and motivation</li>
-            <li><strong>Background/History of Regional Rural Bank:</strong> Understanding of RRBs, their structure and role</li>
-            <li><strong>Current Affairs for Banking:</strong> Recent developments in banking sector, RBI policies, government schemes</li>
-            <li><strong>Domain Knowledge:</strong> Banking fundamentals, operations, and financial awareness</li>
+            <li><strong>Personal Introduction:</strong> Your background, education, and motivation</li>
+            <li><strong>Technical Knowledge:</strong> Domain expertise and relevant skills</li>
+            <li><strong>Problem Solving:</strong> Scenarios and practical thinking</li>
+            <li><strong>Domain Knowledge:</strong> Fundamentals and industry awareness</li>
           </ul>
         </section>
 

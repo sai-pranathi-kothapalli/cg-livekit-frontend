@@ -30,8 +30,8 @@ const ROUND_INFO = [
   },
   {
     number: 4,
-    name: 'Banking & RRB',
-    description: 'Banking fundamentals and RRB-specific knowledge',
+    name: 'Domain & Banking',
+    description: 'Domain fundamentals and banking knowledge',
     time_target: 44,
     icon: '🏦',
   },

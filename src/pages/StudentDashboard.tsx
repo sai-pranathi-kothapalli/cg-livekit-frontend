@@ -260,7 +260,7 @@ export default function StudentDashboard() {
               </div>
             </div>
             <p className="text-muted-foreground">
-              Complete your RRB PO resume and details to proceed with interview slot selection.
+              Complete your resume and details to proceed with interview slot selection.
             </p>
           </div>
 

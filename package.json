@@ -18,6 +18,7 @@
     "@livekit/protocol": "^1.40.0",
     "@mediapipe/camera_utils": "^0.3.1675466862",
     "@mediapipe/face_detection": "^0.4.1646425229",
+    "@mediapipe/face_mesh": "^0.4.1633559619",
     "@mediapipe/hands": "^0.4.1675469240",
     "@monaco-editor/react": "^4.7.0",
     "@phosphor-icons/react": "^2.1.8",

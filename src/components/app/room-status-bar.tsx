@@ -8,18 +8,18 @@ interface RoomStatusBarProps {
   timeRemaining?: number | null; // Time remaining in minutes
 }
 
-export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {}) {
+export function RoomStatusBar({ timeRemaining: _timeRemaining = null }: RoomStatusBarProps = {}) {
   const session = useSessionContext();
   const room = session.room;
   const agent = useAgent();
   const remoteParticipants = useRemoteParticipants();
-  
+
   const [info, setInfo] = useState<{
     roomSid: string | null;
     localSid: string | null;
     remoteSids: Array<{ identity: string; sid: string; name: string | null }>;
   }>({ roomSid: null, localSid: null, remoteSids: [] });
-  
+
   // Internet connectivity state
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -28,14 +28,14 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
     return true;
   });
   const [isLiveKitConnected, setIsLiveKitConnected] = useState(false);
-  
+
   // Agent health status
   const [agentHealthStatus, setAgentHealthStatus] = useState<'healthy' | 'connecting' | 'destroyed' | 'unknown'>('unknown');
 
   // Monitor browser online/offline events
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const handleOnline = () => {
       setIsOnline(true);
       debug.log('🌐 Internet connection restored');
@@ -44,10 +44,10 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
       setIsOnline(false);
       debug.warn('⚠️ Internet connection lost');
     };
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -82,7 +82,7 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
       setIsLiveKitConnected(true);
       debug.log('✅ LiveKit connected');
     };
-    
+
     const handleDisconnected = () => {
       setIsLiveKitConnected(false);
       debug.warn('❌ LiveKit disconnected');
@@ -133,17 +133,18 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
       setAgentHealthStatus('unknown');
       return;
     }
-    
+
     // Check for agent participant
     const agentParticipant = remoteParticipants.find(p => p.isAgent);
-    
+
     // Check agent state if available
     if (agent) {
-      if (agent.state === 'failed' || agent.state === 'destroyed') {
+      const stateStr = agent.state as string;
+      if (stateStr === 'failed' || stateStr === 'destroyed') {
         setAgentHealthStatus('destroyed');
       } else if (agent.state === 'connecting' || agent.state === 'initializing') {
         setAgentHealthStatus('connecting');
-      } else if (agent.state === 'active' && agentParticipant) {
+      } else if (stateStr === 'active' && agentParticipant) {
         setAgentHealthStatus('healthy');
       } else if (agentParticipant) {
         // Agent participant exists but state is unknown
@@ -159,14 +160,14 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
       setAgentHealthStatus('connecting');
     }
   }, [room, isLiveKitConnected, agent, remoteParticipants]);
-  
+
   // Determine overall connection status
-  const connectionStatus = !isOnline 
-    ? 'offline' 
-    : !isLiveKitConnected 
-    ? 'connecting' 
-    : 'connected';
-  
+  const connectionStatus = !isOnline
+    ? 'offline'
+    : !isLiveKitConnected
+      ? 'connecting'
+      : 'connected';
+
   // Get agent health status display
   const getAgentHealthDisplay = () => {
     switch (agentHealthStatus) {
@@ -200,7 +201,7 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
         };
     }
   };
-  
+
   const agentHealth = getAgentHealthDisplay();
 
   // Always show connectivity indicator, even if roomSid is not available yet
@@ -211,52 +212,49 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
           {/* Internet Connectivity Indicator - Always visible */}
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <div 
-                className={`w-2.5 h-2.5 rounded-full transition-colors shadow-sm ${
-                  connectionStatus === 'connected' 
-                    ? 'bg-green-500 animate-pulse' 
+              <div
+                className={`w-2.5 h-2.5 rounded-full transition-colors shadow-sm ${connectionStatus === 'connected'
+                    ? 'bg-green-500 animate-pulse'
                     : connectionStatus === 'connecting'
-                    ? 'bg-yellow-500 animate-pulse'
-                    : 'bg-red-500'
-                }`}
+                      ? 'bg-yellow-500 animate-pulse'
+                      : 'bg-red-500'
+                  }`}
                 title={
                   connectionStatus === 'connected'
                     ? 'Connected - Internet and LiveKit are working'
                     : connectionStatus === 'connecting'
-                    ? 'Connecting... - Waiting for LiveKit connection'
-                    : 'No Internet Connection - Check your network'
+                      ? 'Connecting... - Waiting for LiveKit connection'
+                      : 'No Internet Connection - Check your network'
                 }
               />
-              <span className={`text-xs font-semibold ${
-                connectionStatus === 'connected'
+              <span className={`text-xs font-semibold ${connectionStatus === 'connected'
                   ? 'text-green-600 dark:text-green-400'
                   : connectionStatus === 'connecting'
-                  ? 'text-yellow-600 dark:text-yellow-400'
-                  : 'text-red-600 dark:text-red-400'
-              }`}>
+                    ? 'text-yellow-600 dark:text-yellow-400'
+                    : 'text-red-600 dark:text-red-400'
+                }`}>
                 {connectionStatus === 'connected'
                   ? 'Online'
                   : connectionStatus === 'connecting'
-                  ? 'Connecting...'
-                  : 'Offline'}
+                    ? 'Connecting...'
+                    : 'Offline'}
               </span>
             </div>
           </div>
-          
+
           {/* Timer hidden from candidate — time remaining not shown to user */}
-          
+
           {/* Agent Health Status */}
           {isLiveKitConnected && (
             <div className="flex items-center gap-2 border-l border-input/50 pl-4">
               <div className="flex items-center gap-1.5">
-                <div 
-                  className={`w-2.5 h-2.5 rounded-full transition-colors shadow-sm ${
-                    agentHealthStatus === 'healthy' 
+                <div
+                  className={`w-2.5 h-2.5 rounded-full transition-colors shadow-sm ${agentHealthStatus === 'healthy'
                       ? agentHealth.dotColor + ' animate-pulse'
                       : agentHealthStatus === 'connecting'
-                      ? agentHealth.dotColor + ' animate-pulse'
-                      : agentHealth.dotColor
-                  }`}
+                        ? agentHealth.dotColor + ' animate-pulse'
+                        : agentHealth.dotColor
+                    }`}
                   title={agentHealth.title}
                 />
                 <span className={`text-xs font-semibold ${agentHealth.textColor}`}>
@@ -265,7 +263,7 @@ export function RoomStatusBar({ timeRemaining = null }: RoomStatusBarProps = {})
               </div>
             </div>
           )}
-          
+
           {/* Only show room info if available */}
           {info.roomSid && (
             <>

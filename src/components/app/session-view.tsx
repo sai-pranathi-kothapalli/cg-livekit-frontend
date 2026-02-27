@@ -23,6 +23,7 @@ import { SettingsPanel } from '@/components/pre-interview/SettingsPanel';
 import { VideoMonitor } from '@/components/interview/VideoMonitor';
 import { WarningBanner } from '@/components/interview/WarningBanner';
 import { Gear } from '@phosphor-icons/react';
+import { VisionProctor } from '@/lib/proctoring/visionProctor';
 
 const MotionBottom = motion.create('div');
 
@@ -120,6 +121,25 @@ export const SessionView = ({
     message: string;
     countdown?: number;
   } | null>(null);
+
+  const [visionWarning, setVisionWarning] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!session.isConnected || !session.room) return;
+
+    let hideTimer: number;
+    const proctor = new VisionProctor(session.room, (msg) => {
+      setVisionWarning(msg);
+      clearTimeout(hideTimer);
+      hideTimer = window.setTimeout(() => setVisionWarning(null), 5000);
+    });
+
+    proctor.start();
+    return () => {
+      proctor.stop();
+      clearTimeout(hideTimer);
+    };
+  }, [session.isConnected, session.room]);
 
   // Merge regular messages with manually captured transcript messages, removing duplicates
   // Deduplicate based on message content, timestamp, and origin (within 2 seconds)
@@ -1076,6 +1096,13 @@ export const SessionView = ({
         />
       )}
 
+      {visionWarning && (
+        <WarningBanner
+          severity="warning"
+          message={visionWarning}
+        />
+      )}
+
       {/* Main Content Area: Videos on left, Transcript on right (Google Meet style) */}
       <div className="flex-1 flex flex-row min-h-0 gap-4 pt-14 pb-20 px-4 md:px-6">
         {/* Left Side: Videos Section */}
@@ -1088,7 +1115,6 @@ export const SessionView = ({
               question: currentQuestion,
               onCodeSubmit: handleSubmitCode,
               onRunCode: handleRunCode,
-              room: session.room,
             }}
           />
         </div>

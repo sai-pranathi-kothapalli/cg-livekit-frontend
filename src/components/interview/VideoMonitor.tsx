@@ -21,7 +21,7 @@ export function VideoMonitor({ onWarning, onInterviewTerminated, onStateUpdate, 
     const { localParticipant } = useLocalParticipant();
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    const [warningState, setWarningState] = useState<{
+    const [warningState] = useState<{
         show: boolean;
         severity: 'warning' | 'error' | 'critical';
         message: string;
@@ -93,7 +93,6 @@ export function VideoMonitor({ onWarning, onInterviewTerminated, onStateUpdate, 
     stateRef.current = monitoringState;
 
     // Trackers for rules
-    const cameraOffStart = useRef<number | null>(null);
     const lookingAwayStart = useRef<number | null>(null);
     const handsNearFaceStart = useRef<number | null>(null);
     const activeWarningTypes = useRef<Set<string>>(new Set());

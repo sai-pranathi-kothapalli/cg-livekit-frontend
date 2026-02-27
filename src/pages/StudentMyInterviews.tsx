@@ -10,8 +10,8 @@ export default function StudentMyInterviews() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [interviewData, setInterviewData] = useState<MyInterviewResponse | null>(null);
-  const [analytics, setAnalytics] = useState<StudentAnalyticsResponse | null>(null);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+  const [_analytics, setAnalytics] = useState<StudentAnalyticsResponse | null>(null);
+  const [_loadingAnalytics, setLoadingAnalytics] = useState(true);
 
   useEffect(() => {
     loadInterviewData();

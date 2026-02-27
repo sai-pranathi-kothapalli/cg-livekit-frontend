@@ -1,46 +1,48 @@
+import { Warning } from '@phosphor-icons/react';
+
 interface WarningBannerProps {
     severity: 'warning' | 'error' | 'critical';
     message: string;
     countdown?: number;
 }
 
-export function WarningBanner({ severity: _severity, message, countdown }: WarningBannerProps) {
-    // Although severity is passed, the user wants ALWAYS RED for this specific banner request
+export function WarningBanner({ severity, message, countdown }: WarningBannerProps) {
+    // Subtle red background and border based on severity (maintaining red theme as requested)
+    const isCritical = severity === 'critical';
+
     return (
         <div className="
-      fixed top-0 left-0 right-0 z-[100]
-      bg-red-600
-      text-white
-      py-8
-      text-center
-      shadow-2xl
-      border-b-8 border-red-800
-      animate-slide-down
-      animate-pulse
-    ">
-            <div className="flex flex-col items-center gap-4">
-                {/* Big caution symbol */}
-                <div className="text-8xl animate-bounce">⚠️</div>
+            fixed top-4 left-1/2 -translate-x-1/2 z-[100]
+            w-[calc(100%-2rem)] max-w-[400px]
+            bg-red-50/95 dark:bg-red-950/90
+            backdrop-blur-sm
+            text-red-900 dark:text-red-100
+            py-3 px-4 rounded-2xl
+            shadow-lg border border-red-200/50 dark:border-red-800/50
+            flex items-center gap-3
+            animate-in fade-in slide-in-from-top-4 duration-300
+        ">
+            <div className={`
+                shrink-0 p-2 rounded-full 
+                ${isCritical ? 'bg-red-500 text-white animate-pulse' : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400'}
+            `}>
+                <Warning size={20} weight="fill" />
+            </div>
 
-                {/* Main message */}
-                <div className="text-4xl font-black uppercase tracking-wide">
+            <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold leading-tight truncate">
                     {message}
-                </div>
-
-                {/* Countdown */}
+                </p>
                 {countdown !== undefined && countdown > 0 && (
-                    <div className="flex items-center gap-4">
-                        <span className="text-2xl">Interview ends in:</span>
-                        <span className="text-6xl font-black bg-white text-red-600 px-8 py-4 rounded-xl animate-pulse">
-                            {countdown}
-                        </span>
-                    </div>
+                    <p className="text-xs opacity-80 mt-0.5">
+                        Closing in {countdown} seconds
+                    </p>
                 )}
+            </div>
 
-                {/* Instruction */}
-                <div className="text-xl mt-2 font-medium">
-                    📷 Click the camera icon below to enable
-                </div>
+            {/* Instruction - simplified for toast */}
+            <div className="shrink-0 text-[10px] uppercase font-bold tracking-wider opacity-50 px-2 border-l border-red-200 dark:border-red-800">
+                Check Cam
             </div>
         </div>
     );

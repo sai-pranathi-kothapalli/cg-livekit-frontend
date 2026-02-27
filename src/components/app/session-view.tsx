@@ -316,6 +316,25 @@ export const SessionView = ({
     }
   }, [session.isConnected, scheduledAt, interviewDuration, interviewStartTime]);
 
+  // Auto-enable camera on session connect
+  useEffect(() => {
+    if (session.isConnected && session.room?.localParticipant) {
+      const enableCamera = async () => {
+        try {
+          // Check if camera is already enabled
+          if (!session.room.localParticipant.isCameraEnabled) {
+            debug.log('🚀 Auto-enabling camera on join...');
+            await session.room.localParticipant.setCameraEnabled(true);
+            debug.log('✅ Camera enabled successfully');
+          }
+        } catch (error) {
+          debug.error('⚠️ Failed to auto-enable camera:', error);
+        }
+      };
+      enableCamera();
+    }
+  }, [session.isConnected, session.room?.localParticipant]);
+
   // Enter fullscreen when interview starts
   useEffect(() => {
     if (session.isConnected && !isInterviewCompleted) {

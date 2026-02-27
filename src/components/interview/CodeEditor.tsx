@@ -36,145 +36,74 @@ export function CodeEditor({
     const [output, setOutput] = useState<{ text: string; isError: boolean } | null>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
+    const [observationCount, setObservationCount] = useState(0);
+    const [startTime] = useState(Date.now());
+    const [submitted, setSubmitted] = useState(false);
     const editorRef = useRef<any>(null);
 
-    // Typing detection and timers
-    const lastTypingTimeRef = useRef<number>(Date.now());
-    const snapshotIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
-    const lastSnapshotCodeRef = useRef<string>('');
-    const lastSnapshotTimeRef = useRef<number>(0);
+    // Debounce and observation state
+    const lastObservationTimeRef = useRef<number>(0);
+    const observationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleEditorDidMount: OnMount = (editor) => {
         editorRef.current = editor;
         editor.focus();
     };
 
-    // Send code snapshot to AI agent
-    const sendCodeSnapshot = useCallback(async (currentCode: string) => {
-        if (!room?.localParticipant || currentCode === lastSnapshotCodeRef.current) {
-            return; // Don't send if unchanged
-        }
+    const sendCodeObservation = useCallback(async (currentCode: string) => {
+        const now = Date.now();
+        const lines = currentCode.trim().split('\n').length;
 
-        lastSnapshotCodeRef.current = currentCode;
-        lastSnapshotTimeRef.current = Date.now();
+        // Strict Limits
+        if (!room?.localParticipant || submitted) return;
+        if (observationCount >= 3) return;
+        if (lines < 3) return;
+        if (now - lastObservationTimeRef.current < 30000) return;
 
         try {
-            const snapshotMessage = {
-                type: 'code_snapshot',
+            const observationMessage = {
+                type: 'code_observation',
                 question: question,
-                code: currentCode,
                 language: language,
-                timestamp: Date.now()
+                current_code: currentCode,
+                note: "This is a work in progress. Do not evaluate. Just react naturally like an interviewer watching."
             };
 
             const encoder = new TextEncoder();
-            const data = encoder.encode(JSON.stringify(snapshotMessage));
+            const data = encoder.encode(JSON.stringify(observationMessage));
             await room.localParticipant.publishData(data, {
                 reliable: true,
-                topic: 'code-snapshot'
+                topic: 'code-observation'
             });
-            debug.log('📸 Code snapshot sent to AI agent (15s typing interval)');
+
+            setObservationCount(prev => prev + 1);
+            lastObservationTimeRef.current = now;
+            debug.log(`👀 Code observation ${observationCount + 1} sent`);
         } catch (err) {
-            debug.error('❌ Failed to send code snapshot:', err);
+            debug.error('❌ Failed to send code observation:', err);
         }
-    }, [room, question, language]);
+    }, [room, question, language, observationCount, submitted]);
 
-    // Send idle prompt to AI agent
-    const sendIdlePrompt = useCallback(async () => {
-        if (!room?.localParticipant) return;
-
-        try {
-            const idleMessage = {
-                type: 'code_idle',
-                question: question,
-                code: code,
-                language: language,
-                timestamp: Date.now()
-            };
-
-            const encoder = new TextEncoder();
-            const data = encoder.encode(JSON.stringify(idleMessage));
-            await room.localParticipant.publishData(data, {
-                reliable: true,
-                topic: 'code-idle'
-            });
-            debug.log('⏸️ Code idle prompt sent to AI agent (1min no typing)');
-        } catch (err) {
-            debug.error('❌ Failed to send idle prompt:', err);
-        }
-    }, [room, question, code, language]);
-
-    // Handle code changes with typing detection
     const handleCodeChange = useCallback((newCode: string | undefined) => {
         const currentCode = newCode || '';
         setCode(currentCode);
-        
-        const now = Date.now();
-        lastTypingTimeRef.current = now;
 
-        // Clear existing idle timer (user is typing, so reset idle countdown)
-        if (idleTimerRef.current) {
-            clearTimeout(idleTimerRef.current);
-            idleTimerRef.current = null;
+        if (observationTimerRef.current) {
+            clearTimeout(observationTimerRef.current);
         }
 
-        // Start/restart snapshot interval (every 15s while typing)
-        if (currentCode.trim().length > 0) {
-            // Clear existing interval
-            if (snapshotIntervalRef.current) {
-                clearInterval(snapshotIntervalRef.current);
-            }
-
-            // Set up interval to send snapshots every 15s while typing
-            snapshotIntervalRef.current = setInterval(() => {
-                const timeSinceLastTyping = Date.now() - lastTypingTimeRef.current;
-                // Only send if user typed recently (within 3s) - means they're actively typing
-                if (timeSinceLastTyping < 3000) {
-                    const currentCodeValue = editorRef.current?.getValue() || code;
-                    if (currentCodeValue.trim().length > 0) {
-                        sendCodeSnapshot(currentCodeValue);
-                    }
-                } else {
-                    // User stopped typing, clear interval
-                    if (snapshotIntervalRef.current) {
-                        clearInterval(snapshotIntervalRef.current);
-                        snapshotIntervalRef.current = null;
-                    }
-                }
-            }, 15000); // Every 15 seconds
-
-            // Send first snapshot if enough time has passed since last one
-            const timeSinceLastSnapshot = now - lastSnapshotTimeRef.current;
-            if (timeSinceLastSnapshot >= 15000 && currentCode.trim().length > 0) {
-                sendCodeSnapshot(currentCode);
-            }
-        } else {
-            // Code is empty, clear snapshot interval
-            if (snapshotIntervalRef.current) {
-                clearInterval(snapshotIntervalRef.current);
-                snapshotIntervalRef.current = null;
-            }
+        if (!submitted && observationCount < 3) {
+            observationTimerRef.current = setTimeout(() => {
+                sendCodeObservation(currentCode);
+            }, 8000); // 8 second debounce
         }
+    }, [sendCodeObservation, submitted, observationCount]);
 
-        // Set idle timer to trigger after 1 minute of NO typing
-        idleTimerRef.current = setTimeout(() => {
-            const timeSinceLastTyping = Date.now() - lastTypingTimeRef.current;
-            // Only send idle prompt if user hasn't typed for 1 minute and code exists
-            if (timeSinceLastTyping >= 60000 && currentCode.trim().length > 0) {
-                sendIdlePrompt();
-            }
-        }, 60000); // 1 minute
-    }, [sendCodeSnapshot, sendIdlePrompt]);
-
-    // Cleanup timers on unmount
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
-            if (snapshotIntervalRef.current) {
-                clearInterval(snapshotIntervalRef.current);
-            }
-            if (idleTimerRef.current) {
-                clearTimeout(idleTimerRef.current);
+            if (observationTimerRef.current) {
+                clearTimeout(observationTimerRef.current);
             }
         };
     }, []);
@@ -196,9 +125,39 @@ export function CodeEditor({
     };
 
     const handleSubmit = async () => {
+        if (submitted) return;
         setIsAnalyzing(true);
+        setSubmitted(true);
+
+        if (observationTimerRef.current) {
+            clearTimeout(observationTimerRef.current);
+        }
+
+        const timeTakenSeconds = Math.floor((Date.now() - startTime) / 1000);
+
         try {
-            await onCodeSubmit(code, output?.isError ? `Error: ${output.text}` : output?.text);
+            // Evaluation Payload
+            const submissionPayload = {
+                type: 'code_submission',
+                question: question,
+                language: language,
+                code: code,
+                time_taken_seconds: timeTakenSeconds,
+                observation_count: observationCount,
+                executionOutput: output?.isError ? `Error: ${output.text}` : output?.text
+            };
+
+            // Custom submit logic to ensure all metadata is sent via data channel
+            if (room?.localParticipant) {
+                const encoder = new TextEncoder();
+                const data = encoder.encode(JSON.stringify(submissionPayload));
+                await room.localParticipant.publishData(data, {
+                    reliable: true,
+                    topic: 'code-submission'
+                });
+            }
+
+            await onCodeSubmit(code, output?.text);
         } finally {
             setIsAnalyzing(false);
         }
@@ -214,7 +173,8 @@ export function CodeEditor({
                         <select
                             value={language}
                             onChange={(e) => setLanguage(e.target.value)}
-                            className="bg-transparent text-sm font-medium text-slate-200 outline-none cursor-pointer"
+                            disabled={submitted}
+                            className="bg-transparent text-sm font-medium text-slate-200 outline-none cursor-pointer disabled:opacity-50"
                         >
                             {LANGUAGES.map(lang => (
                                 <option key={lang.value} value={lang.value} className="bg-[#252526]">
@@ -225,7 +185,7 @@ export function CodeEditor({
                         <ChevronDown className="w-3 h-3 text-slate-500" />
                     </div>
                     <div className="h-4 w-px bg-slate-700/50 mx-1" />
-                    <span className="text-xs font-medium text-slate-400 truncate max-w-[300px]">
+                    <span className="text-xs font-medium text-slate-400 truncate max-w-[200px] md:max-w-[400px]">
                         {question || "Coding Challenge"}
                     </span>
                 </div>
@@ -235,7 +195,7 @@ export function CodeEditor({
                         size="sm"
                         variant="primary"
                         onClick={handleRun}
-                        disabled={isExecuting || isAnalyzing}
+                        disabled={isExecuting || isAnalyzing || submitted}
                         className="bg-blue-600 hover:bg-blue-500 text-white gap-2"
                     >
                         <Play className="w-4 h-4" />
@@ -245,11 +205,11 @@ export function CodeEditor({
                         size="sm"
                         variant="secondary"
                         onClick={handleSubmit}
-                        disabled={isExecuting || isAnalyzing}
+                        disabled={isExecuting || isAnalyzing || submitted}
                         className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2"
                     >
                         <Send className="w-4 h-4" />
-                        Submit
+                        {submitted ? 'Submitted' : 'Submit'}
                     </Button>
                 </div>
             </div>

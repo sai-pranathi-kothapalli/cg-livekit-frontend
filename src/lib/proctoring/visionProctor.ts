@@ -1,5 +1,5 @@
 import { FaceMesh } from '@mediapipe/face_mesh';
-import type { Room } from 'livekit-client';
+import { Room, Track } from 'livekit-client';
 
 export class VisionProctor {
   private faceMesh: FaceMesh;
@@ -16,7 +16,7 @@ export class VisionProctor {
   constructor(room: Room, onAlert: (message: string) => void) {
     this.room = room;
     this.onAlertCallback = onAlert;
-    
+
     this.faceMesh = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
@@ -49,7 +49,7 @@ export class VisionProctor {
   private triggerAlert(message: string) {
     const now = Date.now();
     if (now - this.lastAlertTime < 3000) return; // Debounce 3 seconds
-    
+
     this.lastAlertTime = now;
     this.onAlertCallback(message);
 
@@ -73,11 +73,14 @@ export class VisionProctor {
 
     // 1. Check Camera OFF
     const videoTracks = Array.from(this.room.localParticipant?.videoTrackPublications.values() || []);
-    const isCameraEnabled = videoTracks.some(t => !t.isMuted);
-    
-    // We get the video element as requested
-    const videoElement = document.querySelector('video') as HTMLVideoElement;
-    
+    const cameraPub = videoTracks.find(t => t.source === Track.Source.Camera);
+    const isCameraEnabled = cameraPub && !cameraPub.isMuted;
+
+    // The previous bug was here: document.querySelector('video') grabs the FIRST video on the screen.
+    // In this layout, the AI Interviewer is often the first video, meaning it was analyzing the AI's face instead of the candidate's!
+    // Instead, we specifically grab the HTML element natively attached to the candidate's LiveKit camera track stream.
+    const videoElement = cameraPub?.videoTrack?.attachedElements?.[0] as HTMLVideoElement;
+
     if (this.room.localParticipant && !isCameraEnabled) {
       this.triggerAlert("Please turn on your camera.");
       return;
@@ -118,17 +121,17 @@ export class VisionProctor {
     }
 
     const landmarks = faces[0];
-    
+
     // 4. Face Covered (eyes and nose not visible)
     // Face mesh returns array of 468+ landmarks. 
     // Left Eye roughly index 33, Right Eye index 263, Nose tip index 1
     const leftEye = landmarks[33];
     const rightEye = landmarks[263];
     const nose = landmarks[1];
-    
+
     if (!leftEye || !rightEye || !nose) {
-       this.triggerAlert("Do not cover your face.");
-       return;
+      this.triggerAlert("Do not cover your face.");
+      return;
     }
 
     // 5. Looking Away for > 3 seconds
@@ -144,7 +147,7 @@ export class VisionProctor {
       } else if (now - this.lookingAwayStartTime > 3000) {
         this.triggerAlert("Please maintain eye contact with the screen.");
         // reset start time so it doesn't spam every frame unless 3 seconds pass again
-        this.lookingAwayStartTime = now; 
+        this.lookingAwayStartTime = now;
       }
     } else {
       this.lookingAwayStartTime = null;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useSessionContext, useAgent, useRemoteParticipants } from '@livekit/components-react';
+import { useSessionContext, useAgent } from '@livekit/components-react';
 import { useEffect, useState } from 'react';
 import { debug } from '@/lib/debug';
 
@@ -12,7 +12,9 @@ export function RoomStatusBar({ timeRemaining: _timeRemaining = null }: RoomStat
   const session = useSessionContext();
   const room = session.room;
   const agent = useAgent();
-  const remoteParticipants = useRemoteParticipants();
+  
+  // Local state for remote participants (replaces useRemoteParticipants hook to avoid stale state)
+  const [remoteParticipants, setRemoteParticipants] = useState<Array<any>>([]);
 
   const [info, setInfo] = useState<{
     roomSid: string | null;
@@ -101,14 +103,17 @@ export function RoomStatusBar({ timeRemaining: _timeRemaining = null }: RoomStat
   useEffect(() => {
     if (!room) {
       setInfo({ roomSid: null, localSid: null, remoteSids: [] });
+      setRemoteParticipants([]);
       return;
     }
 
     const update = () => {
+      const remotes = Array.from(room.remoteParticipants.values());
+      setRemoteParticipants(remotes); // Update remote participants state
       setInfo({
         roomSid: (room as any).sid || null,
         localSid: room.localParticipant?.sid || null,
-        remoteSids: Array.from(room.remoteParticipants.values()).map((p) => ({
+        remoteSids: remotes.map((p) => ({
           identity: p.identity,
           sid: p.sid,
           name: p.name || null,
@@ -118,12 +123,25 @@ export function RoomStatusBar({ timeRemaining: _timeRemaining = null }: RoomStat
 
     update();
 
+    // Listen to participant events
     room.on('participantConnected', update);
     room.on('participantDisconnected', update);
+    
+    // CRITICAL: Also listen to track events to catch participants that join via track subscription
+    // This fixes the stale state issue where tracks are subscribed before participantConnected fires
+    const handleTrackSubscribed = () => {
+      // When a track is subscribed, the participant might now be in remoteParticipants
+      update();
+    };
+    
+    room.on('trackSubscribed', handleTrackSubscribed);
+    room.on('trackPublished', handleTrackSubscribed); // Also catch when tracks are published
 
     return () => {
       room.off('participantConnected', update);
       room.off('participantDisconnected', update);
+      room.off('trackSubscribed', handleTrackSubscribed);
+      room.off('trackPublished', handleTrackSubscribed);
     };
   }, [room]);
 

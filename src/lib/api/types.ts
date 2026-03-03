@@ -398,10 +398,6 @@ export interface EvaluationResponse {
   candidate: {
     name: string;
     email: string;
-    application_form?: {
-      text?: string;
-      url?: string;
-    };
   };
   interview_metrics?: {
     duration_minutes?: number;

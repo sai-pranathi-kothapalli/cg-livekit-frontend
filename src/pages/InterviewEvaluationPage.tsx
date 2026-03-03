@@ -6,44 +6,6 @@ import { getEvaluation, type EvaluationResponse } from '@/lib/api';
 // Using the API response types directly
 type EvaluationData = EvaluationResponse;
 
-const ROUND_INFO = [
-  {
-    number: 1,
-    name: 'Self Introduction',
-    description: 'Personal background, education, and career journey',
-    time_target: 7,
-    icon: '👋',
-  },
-  {
-    number: 2,
-    name: 'GK & Current Affairs',
-    description: 'General knowledge and awareness of current events',
-    time_target: 17,
-    icon: '📰',
-  },
-  {
-    number: 3,
-    name: 'Domain Knowledge',
-    description: 'Technical knowledge related to candidate\'s field',
-    time_target: 29,
-    icon: '🎓',
-  },
-  {
-    number: 4,
-    name: 'Domain & Banking',
-    description: 'Domain fundamentals and banking knowledge',
-    time_target: 44,
-    icon: '🏦',
-  },
-  {
-    number: 5,
-    name: 'Situational & Closing',
-    description: 'Practical scenarios and interview conclusion',
-    time_target: 50,
-    icon: '💼',
-  },
-];
-
 export default function InterviewEvaluationPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -54,7 +16,7 @@ export default function InterviewEvaluationPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'rounds' | 'transcript' | 'application'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'transcript'>('overview');
 
   useEffect(() => {
     if (token) {
@@ -262,9 +224,7 @@ export default function InterviewEvaluationPage() {
             <nav className="-mb-px flex space-x-8">
               {[
                 { id: 'overview', label: 'Overview', icon: '📊' },
-                { id: 'rounds', label: 'Round Performance', icon: '🎯' },
                 { id: 'transcript', label: 'Full Transcript', icon: '💬' },
-                { id: 'application', label: 'Application Context', icon: '📄' },
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -377,90 +337,6 @@ export default function InterviewEvaluationPage() {
             </div>
           )}
 
-          {activeTab === 'rounds' && (
-            <div className="space-y-4">
-              {evaluationData.rounds && evaluationData.rounds.length > 0 ? (
-                evaluationData.rounds.map((round, index) => {
-                  const roundInfo = ROUND_INFO.find(r => r.number === round.round_number) || ROUND_INFO[index] || ROUND_INFO[0];
-                  return (
-                    <div
-                      key={round.round_number}
-                      className="rounded-lg border border-border bg-card p-6 shadow-sm"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <span className="text-3xl">{roundInfo.icon}</span>
-                            <div>
-                              <h3 className="text-lg font-semibold">
-                                Round {round.round_number}: {round.round_name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">{roundInfo.description}</p>
-                            </div>
-                          </div>
-                        </div>
-                        {round.average_rating && (
-                          <div className={`rounded-lg px-4 py-2 ${getScoreBgColor(round.average_rating)}`}>
-                            <div className="text-xs text-muted-foreground">Average Rating</div>
-                            <div className={`text-2xl font-bold ${getScoreColor(round.average_rating)}`}>
-                              {round.average_rating.toFixed(1)}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <div className="text-sm text-muted-foreground">Questions Asked</div>
-                          <div className="mt-1 text-lg font-semibold">{round.questions_asked}</div>
-                        </div>
-                        {round.time_spent_minutes && (
-                          <div>
-                            <div className="text-sm text-muted-foreground">Time Spent</div>
-                            <div className="mt-1 text-lg font-semibold">{round.time_spent_minutes.toFixed(1)} min</div>
-                          </div>
-                        )}
-                        {round.time_target_minutes && (
-                          <div>
-                            <div className="text-sm text-muted-foreground">Target Time</div>
-                            <div className="mt-1 text-lg font-semibold">{round.time_target_minutes} min</div>
-                          </div>
-                        )}
-                      </div>
-
-                      {round.topics_covered && round.topics_covered.length > 0 && (
-                        <div className="mt-4">
-                          <div className="text-sm font-medium text-muted-foreground mb-2">Topics Covered</div>
-                          <div className="flex flex-wrap gap-2">
-                            {round.topics_covered.map((topic, idx) => (
-                              <span
-                                key={idx}
-                                className="rounded-full bg-muted px-3 py-1 text-xs font-medium"
-                              >
-                                {topic}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {round.performance_summary && (
-                        <div className="mt-4 rounded-md bg-muted p-3">
-                          <div className="text-sm font-medium mb-1">Performance Summary</div>
-                          <div className="text-sm text-muted-foreground">{round.performance_summary}</div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="rounded-md border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-600 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-400">
-                  Round evaluation data not available yet.
-                </div>
-              )}
-            </div>
-          )}
-
           {activeTab === 'transcript' && (
             <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
               <h2 className="mb-4 text-xl font-semibold">Full Interview Transcript</h2>
@@ -500,37 +376,6 @@ export default function InterviewEvaluationPage() {
             </div>
           )}
 
-          {activeTab === 'application' && (
-            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold">Application Form Context</h2>
-              {evaluationData.candidate.application_form?.text ? (
-                <div className="space-y-4">
-                  <div className="rounded-md bg-muted p-4">
-                    <div className="text-sm font-medium mb-2">Application Details</div>
-                    <pre className="text-sm whitespace-pre-wrap text-muted-foreground">
-                      {evaluationData.candidate.application_form.text}
-                    </pre>
-                  </div>
-                  {evaluationData.candidate.application_form.url && (
-                    <div>
-                      <a
-                        href={evaluationData.candidate.application_form.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        View Application Document →
-                      </a>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Application form data not available
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
     </div>

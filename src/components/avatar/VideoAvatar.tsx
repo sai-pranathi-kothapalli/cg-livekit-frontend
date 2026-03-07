@@ -9,9 +9,9 @@ interface VideoAvatarProps {
 }
 
 /**
- * VideoAvatar Component
- * Switches between idle and talking videos based on audio presence.
- * Uses Web Audio API AnalyserNode to detect audio level in real-time.
+ * VideoAvatar Component (Fallback)
+ * Static avatar placeholder shown when Tavus avatar is not available.
+ * Replaces video loops with a professional static avatar.
  */
 export function VideoAvatar({ agentAudioTrack, agentState }: VideoAvatarProps) {
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -27,7 +27,7 @@ export function VideoAvatar({ agentAudioTrack, agentState }: VideoAvatarProps) {
             return;
         }
 
-        // Initialize AudioContext and Analyser
+        // Initialize AudioContext and Analyser for visual feedback
         if (!audioContextRef.current) {
             audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         }
@@ -79,28 +79,58 @@ export function VideoAvatar({ agentAudioTrack, agentState }: VideoAvatarProps) {
     const finalIsSpeaking = isSpeaking || agentState === 'speaking';
 
     return (
-        <div className="relative h-full w-full overflow-hidden bg-slate-900 flex items-center justify-center">
-            {/* Talking Video (Shown when speaking) */}
-            <video
-                src="/videos/talking.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-in-out ${finalIsSpeaking ? 'opacity-100' : 'opacity-0'
+        <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 flex items-center justify-center">
+            {/* Static Avatar - Professional placeholder */}
+            <div className="relative flex flex-col items-center justify-center">
+                {/* Avatar Circle with subtle pulse when speaking */}
+                <div 
+                    className={`relative w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-2xl transition-all duration-500 ${
+                        finalIsSpeaking ? 'scale-110 shadow-blue-500/50' : 'scale-100'
                     }`}
-            />
+                >
+                    {/* Animated ring when speaking */}
+                    {finalIsSpeaking && (
+                        <div className="absolute inset-0 rounded-full border-4 border-blue-400/50 animate-ping" />
+                    )}
+                    
+                    {/* Initial/Icon */}
+                    <svg 
+                        className="w-16 h-16 text-white" 
+                        fill="none" 
+                        viewBox="0 0 24 24" 
+                        stroke="currentColor"
+                    >
+                        <path 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            strokeWidth={2} 
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" 
+                        />
+                    </svg>
+                </div>
 
-            {/* Idle Video (Shown when silent) */}
-            <video
-                src="/videos/idle.mp4"
-                autoPlay
-                loop
-                muted
-                playsInline
-                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ease-in-out ${finalIsSpeaking ? 'opacity-0' : 'opacity-100'
-                    }`}
-            />
+                {/* Status indicator */}
+                <div className="mt-4 flex items-center gap-2">
+                    <div 
+                        className={`h-2 w-2 rounded-full transition-all duration-300 ${
+                            finalIsSpeaking 
+                                ? 'bg-blue-400 animate-pulse shadow-lg shadow-blue-400/50' 
+                                : 'bg-slate-400'
+                        }`} 
+                    />
+                    <span className="text-xs font-medium text-slate-300 uppercase tracking-wider">
+                        {finalIsSpeaking ? 'Speaking' : 'Ready'}
+                    </span>
+                </div>
+            </div>
+
+            {/* Subtle background pattern */}
+            <div className="absolute inset-0 opacity-10">
+                <div className="absolute inset-0" style={{
+                    backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)',
+                    backgroundSize: '40px 40px'
+                }} />
+            </div>
         </div>
     );
 }

@@ -50,19 +50,21 @@ export default function AdminManageSlots() {
   const [formData, setFormData] = useState({
     slot_datetime: '',
     max_capacity: 30,
-    duration_minutes: 45, // Default 45 minutes
+    duration_minutes: 30, // Default 30 minutes
     notes: '',
   });
+
 
   // Day slots form state
   const [dayFormData, setDayFormData] = useState({
     date: '',
     start_time: '09:00',
     end_time: '21:00',
-    interval_minutes: 45,
+    interval_minutes: 30,
     max_capacity: 30,
     notes: '',
   });
+
 
   useEffect(() => {
     loadSlots();
@@ -89,7 +91,8 @@ export default function AdminManageSlots() {
       setCreating(true);
       await createSlot(formData);
       setShowCreateModal(false);
-      setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
+      setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 30, notes: '' });
+
       await loadSlots();
     } catch (err) {
       setError((err as Error).message || 'Failed to create slot');
@@ -101,7 +104,7 @@ export default function AdminManageSlots() {
   const handleEdit = (slot: SlotResponse) => {
     setEditingSlot(slot);
     // Calculate duration from start_time and end_time if available, otherwise default to 45
-    let duration = 45;
+    let duration = 30;
     if (slot.start_time && slot.end_time) {
       try {
         const start = new Date(slot.start_time);
@@ -110,9 +113,10 @@ export default function AdminManageSlots() {
           duration = Math.round((end.getTime() - start.getTime()) / (1000 * 60)); // Convert to minutes
           // Ensure duration is valid (at least 1 minute, max 120)
           if (duration < 1 || duration > 120) {
-            duration = 45; // Default if calculated duration is invalid
+            duration = 30; // Default if calculated duration is invalid
           }
         }
+
       } catch (e) {
         debug.warn('Could not calculate duration from slot times:', e);
       }
@@ -140,7 +144,8 @@ export default function AdminManageSlots() {
       await updateSlot(editingSlot.id, updateData);
       setShowCreateModal(false);
       setEditingSlot(null);
-      setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
+      setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 30, notes: '' });
+
       await loadSlots();
     } catch (err) {
       setError((err as Error).message || 'Failed to update slot');
@@ -159,10 +164,11 @@ export default function AdminManageSlots() {
         date: '',
         start_time: '09:00',
         end_time: '21:00',
-        interval_minutes: 45,
+        interval_minutes: 30,
         max_capacity: 30,
         notes: '',
       });
+
 
       if (result.errors && result.errors.length > 0) {
         setError(`Created ${result.created_count} slots, but ${result.errors.length} failed: ${result.errors.join(', ')}`);
@@ -307,7 +313,8 @@ export default function AdminManageSlots() {
             <button
               onClick={() => {
                 setEditingSlot(null);
-                setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
+                setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 30, notes: '' });
+
                 setShowCreateModal(true);
               }}
               className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
@@ -459,12 +466,14 @@ export default function AdminManageSlots() {
                   min="1"
                   max="120"
                   value={formData.duration_minutes}
-                  onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 45 })}
+                  onChange={(e) => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 30 })}
                   className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Duration of each interview in this slot (e.g., 5, 10, 30, 45 minutes). Default: 45 minutes.
+                  Duration of each interview in this slot (e.g., 5, 10, 30, 45 minutes). Default: 30 minutes.
                 </p>
+
               </div>
 
               <div>
@@ -511,7 +520,8 @@ export default function AdminManageSlots() {
                   onClick={() => {
                     setShowCreateModal(false);
                     setEditingSlot(null);
-                    setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 45, notes: '' });
+                    setFormData({ slot_datetime: '', max_capacity: 30, duration_minutes: 30, notes: '' });
+
                   }}
                   className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
                 >
@@ -583,12 +593,14 @@ export default function AdminManageSlots() {
                   required
                   min="1"
                   value={dayFormData.interval_minutes}
-                  onChange={(e) => setDayFormData({ ...dayFormData, interval_minutes: parseInt(e.target.value) || 45 })}
+                  onChange={(e) => setDayFormData({ ...dayFormData, interval_minutes: parseInt(e.target.value) || 30 })}
                   className="w-full px-4 py-2 border border-border rounded-lg bg-background text-foreground"
+
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Time between each slot (e.g., 45 minutes)
+                  Time between each slot (e.g., 30 minutes)
                 </p>
+
               </div>
 
               <div>
@@ -637,10 +649,11 @@ export default function AdminManageSlots() {
                       date: '',
                       start_time: '09:00',
                       end_time: '21:00',
-                      interval_minutes: 45,
+                      interval_minutes: 30,
                       max_capacity: 30,
                       notes: '',
                     });
+
                   }}
                   className="flex-1 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors"
                 >

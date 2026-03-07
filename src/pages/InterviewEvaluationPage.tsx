@@ -140,8 +140,9 @@ export default function InterviewEvaluationPage() {
             </div>
           </div>
 
-          {/* Processing State if score is missing */}
-          {evaluationData.overall_score == null && (
+          {/* Processing State if feedback indicates progress */}
+          {evaluationData.overall_feedback === "AI analysis in progress..." && (
+
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 shadow-sm dark:border-blue-800 dark:bg-blue-950">
               <div className="flex items-center gap-4">
                 <div className="animate-spin text-2xl">⏳</div>

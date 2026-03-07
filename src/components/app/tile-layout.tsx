@@ -64,16 +64,7 @@ export function TileLayout({
   const cameraTrack: TrackReference | undefined = useLocalTrackRef(Track.Source.Camera);
   const { localParticipant } = useLocalParticipant();
 
-  // Search for any remote video track (Tavus usually shows up here)
-  // IMPORTANT: Filter out local participant's tracks to avoid duplicate video feeds
-  const allVideoTracksForSearch = useTracks([Track.Source.Camera], { onlySubscribed: true });
-  const remoteVideoTracks = allVideoTracksForSearch.filter(
-    (t) => !t.participant.isLocal && t.participant.identity !== localParticipant.identity
-  );
 
-  const tavusTrack = remoteVideoTracks.find(
-    (t) => t.participant.identity !== 'local' && t.participant.identity !== ''
-  );
 
   // --- AGENT PINNING (Bug 2 Fix) ---
   // Identify the "Primary" agent to avoid duplicate voice/video if multiple agents join
@@ -106,17 +97,9 @@ export function TileLayout({
   }, [allAgentTracks, fallbackAudioTrack, fallbackVideoTrack]);
 
   const agentAudioTrack = pinnedAudioTrack;
-  const agentVideoTrack = pinnedVideoTrack || tavusTrack;
+  const agentVideoTrack = pinnedVideoTrack;
 
-  // Debug log to see who else is in the room
-  debug.log('Local participant identity:', localParticipant.identity);
-  debug.log('All video tracks:', allVideoTracksForSearch.map(t => ({
-    identity: t.participant.identity,
-    isLocal: t.participant.isLocal
-  })));
-  debug.log('Remote participants:', remoteVideoTracks.map(t => t.participant.identity));
 
-  // No-op for tavusTrack already integrated above
 
   const isCameraEnabled = cameraTrack && !cameraTrack.publication.isMuted;
   const isScreenShareEnabled = screenShareTrack && !screenShareTrack.publication.isMuted;

@@ -215,7 +215,13 @@ export function CodeEditor({
             </div>
 
             {/* Editor Area */}
-            <div className="flex-grow relative min-h-[200px]">
+            <div
+                className="flex-grow relative min-h-[200px]"
+                onContextMenu={(e) => e.preventDefault()}
+                onCopy={(e) => e.preventDefault()}
+                onPaste={(e) => e.preventDefault()}
+                onCut={(e) => e.preventDefault()}
+            >
                 <Editor
                     height="100%"
                     language={language === 'cpp' ? 'cpp' : language}
@@ -239,6 +245,7 @@ export function CodeEditor({
                         readOnly: false,
                         cursorStyle: 'line',
                         renderWhitespace: 'none',
+                        contextmenu: false,
                     }}
                 />
             </div>

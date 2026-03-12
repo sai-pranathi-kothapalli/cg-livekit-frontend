@@ -3,8 +3,450 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEvaluation, type EvaluationResponse } from '@/lib/api';
 
-// Using the API response types directly
 type EvaluationData = EvaluationResponse;
+
+// ─── colour helpers ────────────────────────────────────────────────────────────
+
+function getScoreColor(score: number) {
+  if (score >= 8) return '#22c55e';
+  if (score >= 6) return '#3b82f6';
+  if (score >= 4) return '#eab308';
+  return '#ef4444';
+}
+
+function getScoreLabel(score: number) {
+  if (score >= 8) return 'Excellent';
+  if (score >= 6) return 'Good';
+  if (score >= 4) return 'Fair';
+  return 'Needs Improvement';
+}
+
+// ─── feedback parser helpers ──────────────────────────────────────────────────
+
+
+/**
+ * Extract bullet-style issues from the feedback that are relevant to a skill.
+ * Falls back to score-based defaults if nothing found.
+ */
+function extractIssues(raw: string, skill: 'communication' | 'technical' | 'problem_solving', score: number): string[] {
+  const keywords: Record<string, string[]> = {
+    communication: ['communication', 'clarity', 'articulate', 'explain', 'express', 'verbal', 'coherent', 'response'],
+    technical: ['technical', 'knowledge', 'concept', 'code', 'algorithm', 'framework', 'system', 'programming'],
+    problem_solving: ['problem', 'solving', 'approach', 'logic', 'reasoning', 'think', 'solution', 'analysis'],
+  };
+
+  const kws = keywords[skill];
+  // Collect bullet lines from the feedback that mention this skill's keywords
+  const lines = raw
+    .split('\n')
+    .filter(l => l.trim().match(/^[-*•]/) || l.trim().match(/^\d+\./))
+    .map(l => l.replace(/^[-*•\d.]\s*/, '').replace(/\*\*(.*?)\*\*/g, '$1').trim())
+    .filter(l => kws.some(kw => l.toLowerCase().includes(kw)) && l.length > 10 && l.length < 120);
+
+  if (lines.length >= 1) return lines.slice(0, 3);
+
+  // Score-based defaults
+  if (score >= 8) {
+    return {
+      communication: ['Clear and structured responses', 'Good use of examples', 'Active engagement'],
+      technical: ['Strong conceptual accuracy', 'Demonstrated depth', 'Handled edge cases well'],
+      problem_solving: ['Systematic approach', 'Clear reasoning', 'Considered trade-offs']
+    }[skill];
+  }
+  if (score >= 6) {
+    return {
+      communication: ['Mostly clear with minor gaps', 'Some answers lacked depth', 'Generally good engagement'],
+      technical: ['Core concepts understood', 'Minor knowledge gaps', 'Could improve on edge cases'],
+      problem_solving: ['Reasonable approach used', 'Some logical gaps', 'Needs more structured thinking']
+    }[skill];
+  }
+  if (score >= 4) {
+    return {
+      communication: ['Unclear explanations in several answers', 'Hesitation noted', 'Needed prompting to elaborate'],
+      technical: ['Surface-level knowledge shown', 'Struggled with advanced topics', 'Key concepts were missed'],
+      problem_solving: ['Inconsistent problem approach', 'Skipped intermediate steps', 'Limited reasoning shown']
+    }[skill];
+  }
+  return {
+    communication: ['Unable to clearly express ideas', 'Fragmented or off-topic responses', 'No coherent structure observed'],
+    technical: ['Unable to answer core technical questions', 'Fundamental gaps detected', 'No domain knowledge shown'],
+    problem_solving: ['No structured problem approach', 'Could not break down problems', 'Avoided analytical questions']
+  }[skill];
+}
+
+/**
+ * Try to pull a concrete example sentence from the feedback related to the skill.
+ */
+function extractExample(raw: string, skill: 'communication' | 'technical' | 'problem_solving', score: number): string {
+  const keywords: Record<string, string[]> = {
+    communication: ['explain', 'said', 'responded', 'stated', 'express', 'answer', 'articulate'],
+    technical: ['technical', 'code', 'algorithm', 'concept', 'knowledge', 'implement', 'SQL', 'framework'],
+    problem_solving: ['approach', 'solve', 'solution', 'logic', 'reasoning', 'problem', 'analysis'],
+  };
+
+  const kws = keywords[skill];
+  const quoted = raw.match(/"([^"]{15,120})"/g);
+  if (quoted) {
+    const match = quoted.find(q => kws.some(kw => q.toLowerCase().includes(kw)));
+    if (match) return `"${match.replace(/^"|"$/g, '')}"`;
+  }
+
+  // Fallback examples per score range
+  const fallbacks: Record<string, Record<string, string>> = {
+    communication: {
+      good: 'Candidate explained concepts using concrete examples with clarity.',
+      fair: 'Candidate had difficulty elaborating on answers without prompting.',
+      poor: 'Responses were often vague, off-topic, or missing key context.',
+    },
+    technical: {
+      good: 'Candidate correctly explained core concepts and discussed trade-offs.',
+      fair: 'Candidate knew basic terms but struggled with deeper implementation details.',
+      poor: 'Candidate could not answer fundamental domain questions.',
+    },
+    problem_solving: {
+      good: 'Candidate broke down the problem systematically and reasoned about edge cases.',
+      fair: 'Candidate attempted a solution but skipped key reasoning steps.',
+      poor: 'Candidate was unable to structure a meaningful approach to problems.',
+    },
+  };
+
+  const tier = score >= 6 ? 'good' : score >= 4 ? 'fair' : 'poor';
+  return fallbacks[skill][tier];
+}
+
+// ─── feedback section parser ──────────────────────────────────────────────────
+
+const SKIP_SECTION = /hire recommendation|can the candidate be hired|scorecard/i;
+
+function parseSections(raw: string) {
+  const parts = raw.split(/\n(?=#{1,4}\s)/);
+  const out: { title: string; body: string }[] = [];
+
+  for (const part of parts) {
+    const hm = part.match(/^#{1,4}\s+(.+)/);
+    if (hm) {
+      const title = hm[1].trim();
+      if (SKIP_SECTION.test(title)) continue;
+      const body = part
+        .replace(/^#{1,4}\s+.+\n?/, '')
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .split('\n')
+        .filter(l => !l.trim().startsWith('|'))
+        .join('\n')
+        .trim();
+      if (body) out.push({ title, body });
+    } else {
+      const body = part
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/\*(.*?)\*/g, '$1')
+        .split('\n')
+        .filter(l => !l.trim().startsWith('|'))
+        .join('\n')
+        .trim();
+      if (body) out.push({ title: 'Summary', body });
+    }
+  }
+  if (!out.length && raw.trim()) out.push({ title: 'Feedback', body: raw.trim() });
+  return out;
+}
+
+// ─── Bar chart ────────────────────────────────────────────────────────────────
+
+function BarChart({ score }: { score: number }) {
+  const pct = Math.round((score / 10) * 100);
+  const color = getScoreColor(score);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div style={{
+        flex: 1,
+        height: 8,
+        borderRadius: 99,
+        background: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${pct}%`,
+          height: '100%',
+          borderRadius: 99,
+          background: color,
+          transition: 'width 0.6s ease',
+          boxShadow: `0 0 8px ${color}60`,
+        }} />
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 700, color, minWidth: 36 }}>
+        {score.toFixed(1)}
+      </span>
+    </div>
+  );
+}
+
+// ─── Skill card ───────────────────────────────────────────────────────────────
+
+interface SkillCardProps {
+  icon: string;
+  label: string;
+  score: number;
+  issues: string[];
+  example: string;
+}
+
+function SkillCard({ icon, label, score, issues, example }: SkillCardProps) {
+  const color = getScoreColor(score);
+  const scoreLabel = getScoreLabel(score);
+
+  return (
+    <div style={{
+      borderRadius: 14,
+      border: `1px solid ${color}30`,
+      background: `${color}08`,
+      padding: '20px 22px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 14,
+    }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 20 }}>{icon}</span>
+          <span style={{ fontWeight: 700, fontSize: 15, color: 'rgba(255,255,255,0.88)' }}>{label}</span>
+        </div>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color,
+          background: `${color}18`,
+          border: `1px solid ${color}40`,
+          borderRadius: 20,
+          padding: '3px 10px',
+        }}>
+          {scoreLabel}
+        </span>
+      </div>
+
+      {/* Bar */}
+      <BarChart score={score} />
+
+      {/* Issues */}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>
+          Issues Detected
+        </div>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {issues.map((issue, i) => (
+            <li key={i} style={{ display: 'flex', gap: 7, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+              <span style={{ color, flexShrink: 0, marginTop: 1 }}>•</span>
+              <span>{issue}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {/* Example */}
+      <div style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderLeft: `3px solid ${color}`,
+        borderRadius: '0 8px 8px 0',
+        padding: '10px 14px',
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(255,255,255,0.3)', marginBottom: 5 }}>
+          Example from interview
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', lineHeight: 1.55 }}>
+          {example}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Overall score ring ───────────────────────────────────────────────────────
+
+function OverallScoreBadge({ score }: { score: number }) {
+  const color = getScoreColor(score);
+  const label = getScoreLabel(score);
+  return (
+    <div style={{
+      borderRadius: 14,
+      border: `1px solid ${color}40`,
+      background: `${color}10`,
+      padding: '24px 28px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    }}>
+      <div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Overall Performance
+        </div>
+        <div style={{ fontSize: 52, fontWeight: 800, color, lineHeight: 1 }}>
+          {score.toFixed(1)}
+          <span style={{ fontSize: 22, fontWeight: 500, color: 'rgba(255,255,255,0.3)' }}> / 10</span>
+        </div>
+        <div style={{ marginTop: 8 }}>
+          <span style={{
+            fontSize: 13, fontWeight: 700,
+            color,
+            background: `${color}18`,
+            border: `1px solid ${color}40`,
+            borderRadius: 20,
+            padding: '4px 14px',
+          }}>
+            {label}
+          </span>
+        </div>
+      </div>
+      <div style={{
+        width: 80, height: 80,
+        borderRadius: '50%',
+        border: `3px solid ${color}30`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 32,
+        opacity: 0.5,
+      }}>
+        🎯
+      </div>
+    </div>
+  );
+}
+
+// ─── Condensed feedback block ─────────────────────────────────────────────────
+
+const ICON_MAP: Record<string, string> = {
+  'Summary': '📝',
+  'Candidate Summary': '📝',
+  'Integrity Analysis': '🔍',
+  'Technical Knowledge': '💻',
+  'Communication': '🗣',
+  'Communication Skills': '🗣',
+  'Problem Solving': '🧠',
+  'Problem Solving Behavior': '🧠',
+  'Behavioral': '🤝',
+  'Behavioral & Soft Skills': '🤝',
+  'Proctoring': '🛡',
+  'Proctoring Violation': '🛡',
+  'Coding': '⌨️',
+  'Coding Question': '⌨️',
+  'Red Flags': '🚩',
+  'Strengths': '✨',
+  'Areas of Concern': '⚠️',
+  'Reasoning': '💡',
+};
+
+function getIcon(title: string) {
+  for (const key of Object.keys(ICON_MAP)) {
+    if (title.toLowerCase().includes(key.toLowerCase())) return ICON_MAP[key];
+  }
+  return '📋';
+}
+
+function CondensedFeedback({ raw }: { raw: string }) {
+  const [expanded, setExpanded] = useState<Record<number, boolean>>({});
+  const sections = parseSections(raw);
+
+  const toggle = (i: number) => setExpanded(prev => ({ ...prev, [i]: !prev[i] }));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {sections.map((s, i) => {
+        const icon = getIcon(s.title);
+        const isOpen = !!expanded[i];
+        const preview = s.body.split('\n').filter(Boolean)[0] || '';
+        const lines = s.body.split('\n').filter(Boolean);
+
+        return (
+          <div key={i} style={{
+            borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.03)',
+            overflow: 'hidden',
+          }}>
+            <button
+              onClick={() => toggle(i)}
+              style={{
+                width: '100%',
+                padding: '13px 16px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: 16 }}>{icon}</span>
+              <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
+                {s.title}
+              </span>
+              {!isOpen && (
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {preview}
+                </span>
+              )}
+              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
+                {isOpen ? '▲' : '▼'}
+              </span>
+            </button>
+
+            {isOpen && (
+              <div style={{ padding: '0 16px 14px 42px' }}>
+                {lines.map((line, j) => {
+                  const isBullet = line.startsWith('* ') || line.startsWith('- ') || line.startsWith('• ');
+                  const text = line.replace(/^[-*•]\s*/, '');
+                  return (
+                    <div key={j} style={{
+                      display: 'flex',
+                      gap: 8,
+                      fontSize: 13,
+                      color: 'rgba(255,255,255,0.68)',
+                      lineHeight: 1.65,
+                      marginBottom: 4,
+                    }}>
+                      {isBullet && <span style={{ color: '#60a5fa', flexShrink: 0, marginTop: 3 }}>•</span>}
+                      <span>{text}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Utility card wrapper ──────────────────────────────────────────────────────
+
+function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{
+      background: 'rgba(255,255,255,0.04)',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 14,
+      padding: '22px 26px',
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function SectionTitle({ icon, children }: { icon?: string; children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+      {icon && <span style={{ fontSize: 18 }}>{icon}</span>}
+      <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.9)' }}>{children}</span>
+    </div>
+  );
+}
+
+// ─── Main page ─────────────────────────────────────────────────────────────────
 
 export default function InterviewEvaluationPage() {
   const { token } = useParams<{ token: string }>();
@@ -15,23 +457,18 @@ export default function InterviewEvaluationPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
+  const [data, setData] = useState<EvaluationData | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'transcript'>('overview');
 
   useEffect(() => {
-    if (token) {
-      loadEvaluationData();
-    }
+    if (token) loadData();
   }, [token]);
 
-  const loadEvaluationData = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-
-      // Fetch evaluation data from API
-      const data = await getEvaluation(token!);
-      setEvaluationData(data);
+      setData(await getEvaluation(token!));
     } catch (err) {
       setError((err as Error).message || 'Failed to load evaluation data');
     } finally {
@@ -39,346 +476,276 @@ export default function InterviewEvaluationPage() {
     }
   };
 
-
-  const formatDate = (dateString: string): string => {
+  const formatDate = (ds: string) => {
     try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+      return new Date(ds).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit',
       });
-    } catch {
-      return dateString;
-    }
+    } catch { return ds; }
   };
 
-  const getScoreColor = (score: number): string => {
-    if (score >= 8) return 'text-green-600 dark:text-green-400';
-    if (score >= 6) return 'text-blue-600 dark:text-blue-400';
-    if (score >= 4) return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-red-600 dark:text-red-400';
-  };
-
-  const getScoreBgColor = (score: number): string => {
-    if (score >= 8) return 'bg-green-100 dark:bg-green-900';
-    if (score >= 6) return 'bg-blue-100 dark:bg-blue-900';
-    if (score >= 4) return 'bg-yellow-100 dark:bg-yellow-900';
-    return 'bg-red-100 dark:bg-red-900';
-  };
-
-  const standaloneWrapper = (content: ReactNode) => (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">{content}</div>
+  const page = (content: ReactNode) => (
+    <div style={{ minHeight: '100vh', background: '#0d0d0d', color: '#fff', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+      <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 20px' }}>
+        {content}
+      </div>
     </div>
   );
 
-  if (loading) {
-    return standaloneWrapper(
-      <div className="flex items-center justify-center p-8">
-        <div className="text-muted-foreground">Loading evaluation data...</div>
-      </div>
-    );
-  }
+  if (loading) return page(
+    <div style={{ display: 'flex', justifyContent: 'center', padding: 64, color: 'rgba(255,255,255,0.35)' }}>
+      Loading evaluation…
+    </div>
+  );
 
-  if (error || !evaluationData) {
-    return standaloneWrapper(
-      <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-        {error || 'Evaluation data not available'}
-      </div>
-    );
-  }
+  if (error || !data) return page(
+    <div style={{ padding: 20, borderRadius: 10, background: '#2d1010', border: '1px solid #7f1d1d', color: '#fca5a5', fontSize: 14 }}>
+      {error || 'Evaluation data not available'}
+    </div>
+  );
 
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:px-8">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Interview Evaluation</h1>
-              <p className="text-muted-foreground mt-1">
-                Comprehensive assessment of interview performance
-              </p>
-            </div>
-            <button
-              onClick={() => navigate(backTo)}
-              className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
-            >
-              ← Back
-            </button>
-          </div>
+  const feedback = data.overall_feedback || '';
+  const isProcessing = feedback === 'AI analysis in progress...';
 
-          {/* Interview Overview Card */}
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold">Interview Overview</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Interview Date & Time</div>
-                <div className="mt-1 text-lg font-semibold">
-                  {formatDate(evaluationData.booking.scheduled_at)}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Duration</div>
-                <div className="mt-1 text-lg font-semibold">
-                  {evaluationData.interview_metrics?.duration_minutes
-                    ? `${evaluationData.interview_metrics.duration_minutes} minutes`
-                    : 'N/A'}
-                </div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground">Status</div>
-                <div className="mt-1">
-                  <span className="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                    Completed
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+  // Build skill cards data
+  const skillCards = [
+    data.communication_quality != null && {
+      icon: '🗣',
+      label: 'Communication Quality',
+      key: 'communication' as const,
+      score: data.communication_quality,
+    },
+    data.technical_knowledge != null && {
+      icon: '💻',
+      label: 'Technical Knowledge',
+      key: 'technical' as const,
+      score: data.technical_knowledge,
+    },
+    data.problem_solving != null && {
+      icon: '🧠',
+      label: 'Problem Solving',
+      key: 'problem_solving' as const,
+      score: data.problem_solving,
+    },
+  ].filter(Boolean) as { icon: string; label: string; key: 'communication' | 'technical' | 'problem_solving'; score: number }[];
 
-          {/* Processing State if feedback indicates progress */}
-          {evaluationData.overall_feedback === "AI analysis in progress..." && (
+  return page(
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
 
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 shadow-sm dark:border-blue-800 dark:bg-blue-950">
-              <div className="flex items-center gap-4">
-                <div className="animate-spin text-2xl">⏳</div>
-                <div>
-                  <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100">AI Analysis in Progress</h3>
-                  <p className="text-sm text-blue-800 dark:text-blue-300">
-                    We're still calculating your detailed scores and feedback. This page will update automatically once the analysis is complete.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Overall Score Card */}
-          {evaluationData.overall_score != null && (
-            <div className={`rounded-lg border border-border p-6 shadow-sm ${getScoreBgColor(evaluationData.overall_score)}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-medium text-muted-foreground">Overall Performance Score</div>
-                  <div className={`mt-2 text-4xl font-bold ${getScoreColor(evaluationData.overall_score)}`}>
-                    {evaluationData.overall_score.toFixed(1)} / 10
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-muted-foreground">Rounds Completed</div>
-                  <div className="mt-1 text-2xl font-semibold">
-                    {evaluationData.interview_metrics?.rounds_completed ?? 0} / 5
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Criteria Scores (from Gemini analysis) */}
-          {(evaluationData.communication_quality != null || evaluationData.technical_knowledge != null || evaluationData.problem_solving != null) && (
-            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold">Analysis Criteria</h2>
-              <p className="text-muted-foreground mb-4 text-sm">
-                Scores from AI analysis of your interview (0–10 per criterion).
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {evaluationData.communication_quality != null && (
-                  <div className="rounded-lg border border-border bg-muted/50 p-4">
-                    <div className="text-sm font-medium text-muted-foreground">Communication Quality</div>
-                    <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.communication_quality)}`}>
-                      {evaluationData.communication_quality.toFixed(1)} / 10
-                    </div>
-                  </div>
-                )}
-                {evaluationData.technical_knowledge != null && (
-                  <div className="rounded-lg border border-border bg-muted/50 p-4">
-                    <div className="text-sm font-medium text-muted-foreground">Technical Knowledge</div>
-                    <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.technical_knowledge)}`}>
-                      {evaluationData.technical_knowledge.toFixed(1)} / 10
-                    </div>
-                  </div>
-                )}
-                {evaluationData.problem_solving != null && (
-                  <div className="rounded-lg border border-border bg-muted/50 p-4">
-                    <div className="text-sm font-medium text-muted-foreground">Problem Solving</div>
-                    <div className={`mt-2 text-2xl font-bold ${getScoreColor(evaluationData.problem_solving)}`}>
-                      {evaluationData.problem_solving.toFixed(1)} / 10
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Overall Feedback (AI summary paragraph) */}
-          <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-3 text-xl font-semibold">Overall Feedback</h2>
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap italic">
-              {evaluationData.overall_feedback || "No feedback available yet."}
-            </p>
-          </div>
-
-          {/* Tabs */}
-          <div className="border-b border-border">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'overview', label: 'Overview', icon: '📊' },
-                { id: 'transcript', label: 'Full Transcript', icon: '💬' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center gap-2 border-b-2 px-1 py-4 text-sm font-medium transition-colors ${activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-muted-foreground hover:border-gray-300 hover:text-foreground'
-                    }`}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <div className="text-sm text-muted-foreground">Total Questions</div>
-                  <div className="mt-1 text-2xl font-bold">
-                    {evaluationData.interview_metrics?.total_questions || 0}
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <div className="text-sm text-muted-foreground">Avg Response Time</div>
-                  <div className="mt-1 text-2xl font-bold">
-                    {evaluationData.interview_metrics?.average_response_time || 0}s
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <div className="text-sm text-muted-foreground">Rounds Completed</div>
-                  <div className="mt-1 text-2xl font-bold">
-                    {evaluationData.interview_metrics?.rounds_completed || 0} / 5
-                  </div>
-                </div>
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <div className="text-sm text-muted-foreground">Interview Duration</div>
-                  <div className="mt-1 text-2xl font-bold">
-                    {evaluationData.interview_metrics?.duration_minutes || 0} min
-                  </div>
-                </div>
-              </div>
-
-              {/* Token Usage */}
-              {evaluationData.token_usage && (
-                <div className="rounded-lg border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-950">
-                  <h3 className="mb-4 text-lg font-semibold text-blue-900 dark:text-blue-100">
-                    📊 Gemini Token Usage
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="rounded-lg bg-white/50 p-4 dark:bg-black/20">
-                      <div className="text-sm font-medium text-blue-800 dark:text-blue-300">Input Tokens (Prompt)</div>
-                      <div className="mt-1 text-2xl font-bold text-blue-900 dark:text-blue-100">
-                        {evaluationData.token_usage.input_tokens?.toLocaleString() || 0}
-                      </div>
-                      <p className="mt-1 text-xs text-blue-700/70 dark:text-blue-400/70">Context + User Speech</p>
-                    </div>
-                    <div className="rounded-lg bg-white/50 p-4 dark:bg-black/20">
-                      <div className="text-sm font-medium text-blue-800 dark:text-blue-300">Output Tokens (Completion)</div>
-                      <div className="mt-1 text-2xl font-bold text-blue-900 dark:text-blue-100">
-                        {evaluationData.token_usage.output_tokens?.toLocaleString() || 0}
-                      </div>
-                      <p className="mt-1 text-xs text-blue-700/70 dark:text-blue-400/70">AI Responses</p>
-                    </div>
-                    <div className="rounded-lg bg-blue-100 p-4 dark:bg-blue-900">
-                      <div className="text-sm font-medium text-blue-900 dark:text-blue-100">Total Tokens</div>
-                      <div className="mt-1 text-2xl font-bold text-blue-950 dark:text-white">
-                        {evaluationData.token_usage.total_tokens?.toLocaleString() || 0}
-                      </div>
-                      <p className="mt-1 text-xs text-blue-800/70 dark:text-blue-300/70">Cumulative session usage</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Strengths & Areas for Improvement */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="rounded-lg border border-green-200 bg-green-50 p-6 dark:border-green-800 dark:bg-green-950">
-                  <h3 className="mb-4 text-lg font-semibold text-green-900 dark:text-green-100">
-                    ✨ Strengths
-                  </h3>
-                  <ul className="space-y-2">
-                    {evaluationData.strengths?.map((strength, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm text-green-800 dark:text-green-200">
-                        <span className="mt-1">✓</span>
-                        <span>{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="rounded-lg border border-orange-200 bg-orange-50 p-6 dark:border-orange-800 dark:bg-orange-950">
-                  <h3 className="mb-4 text-lg font-semibold text-orange-900 dark:text-orange-100">
-                    📈 Areas for Improvement
-                  </h3>
-                  <ul className="space-y-2">
-                    {evaluationData.areas_for_improvement?.map((area, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm text-orange-800 dark:text-orange-200">
-                        <span className="mt-1">→</span>
-                        <span>{area}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'transcript' && (
-            <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-              <h2 className="mb-4 text-xl font-semibold">Full Interview Transcript</h2>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                {evaluationData.transcript && evaluationData.transcript.length > 0 ? (
-                  evaluationData.transcript.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-lg p-4 ${message.role === 'user'
-                          ? 'bg-blue-600 text-white'
-                          : message.role === 'assistant'
-                            ? 'bg-muted text-foreground'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                          }`}
-                      >
-                        <div className="mb-1 text-xs font-medium opacity-70">
-                          {message.role === 'user' ? 'Candidate' : message.role === 'assistant' ? 'Interviewer' : 'System'}
-                          {message.timestamp && (
-                            <span className="ml-2">
-                              {new Date(message.timestamp).toLocaleTimeString()}
-                            </span>
-                          )}
-                        </div>
-                        <div className="whitespace-pre-wrap">{message.content}</div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Transcript not available
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, margin: 0, letterSpacing: '-0.5px' }}>
+            Interview Evaluation
+          </h1>
+          <p style={{ margin: '4px 0 0', color: 'rgba(255,255,255,0.38)', fontSize: 14 }}>
+            Detailed assessment of candidate performance
+          </p>
         </div>
+        <button
+          onClick={() => navigate(backTo)}
+          style={{
+            padding: '8px 18px', borderRadius: 8,
+            border: '1px solid rgba(255,255,255,0.13)',
+            background: 'rgba(255,255,255,0.05)',
+            color: 'rgba(255,255,255,0.75)',
+            cursor: 'pointer', fontSize: 14, fontWeight: 500,
+          }}
+        >
+          ← Back
+        </button>
       </div>
+
+      {/* Interview info strip */}
+      <Card>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              Interview Date & Time
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{formatDate(data.booking.scheduled_at)}</div>
+          </div>
+          {data.interview_metrics?.duration_minutes != null && (
+            <div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Duration</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{data.interview_metrics.duration_minutes} min</div>
+            </div>
+          )}
+          <span style={{
+            padding: '6px 16px', borderRadius: 20,
+            background: '#14532d', color: '#86efac',
+            border: '1px solid #166534', fontSize: 13, fontWeight: 600,
+          }}>
+            ✓ Completed
+          </span>
+        </div>
+      </Card>
+
+      {/* AI processing notice */}
+      {isProcessing && (
+        <Card style={{ background: 'rgba(59,130,246,0.08)', borderColor: 'rgba(59,130,246,0.22)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 22 }}>⏳</span>
+            <div>
+              <div style={{ fontWeight: 600, color: '#93c5fd', marginBottom: 3 }}>AI Analysis in Progress</div>
+              <div style={{ fontSize: 13, color: 'rgba(147,197,253,0.65)' }}>
+                Scores and feedback are being generated — refresh in a moment.
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Overall score */}
+      {data.overall_score != null && (
+        <OverallScoreBadge score={data.overall_score} />
+      )}
+
+      {/* ── Skill cards with bar charts, issues & examples ── */}
+      {skillCards.length > 0 && (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,0.88)', marginBottom: 14 }}>
+            Skill Assessment
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
+            {skillCards.map(card => (
+              <SkillCard
+                key={card.key}
+                icon={card.icon}
+                label={card.label}
+                score={card.score}
+                issues={extractIssues(feedback, card.key, card.score)}
+                example={extractExample(feedback, card.key, card.score)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Condensed feedback accordion ── */}
+      {feedback && !isProcessing && (
+        <Card>
+          <SectionTitle icon="📋">Detailed Feedback</SectionTitle>
+          <CondensedFeedback raw={feedback} />
+        </Card>
+      )}
+
+      {/* ── Tabs ── */}
+      <div style={{ borderBottom: '1px solid rgba(255,255,255,0.09)', display: 'flex', gap: 2 }}>
+        {[
+          { id: 'overview', label: 'Overview', icon: '📊' },
+          { id: 'transcript', label: 'Full Transcript', icon: '💬' },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            style={{
+              padding: '11px 20px', border: 'none',
+              background: 'transparent', cursor: 'pointer',
+              fontWeight: 600, fontSize: 14,
+              display: 'flex', alignItems: 'center', gap: 6,
+              borderBottom: activeTab === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
+              color: activeTab === tab.id ? '#3b82f6' : 'rgba(255,255,255,0.38)',
+              transition: 'color 0.2s',
+            }}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ── Overview tab ── */}
+      {activeTab === 'overview' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          {/* Strengths */}
+          <div style={{
+            borderRadius: 14,
+            border: '1px solid rgba(34,197,94,0.22)',
+            background: 'rgba(34,197,94,0.05)',
+            padding: '20px 22px',
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#86efac', marginBottom: 14 }}>
+              ✨ Strengths
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.strengths?.length
+                ? data.strengths.map((s, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 8, fontSize: 13, color: 'rgba(134,239,172,0.82)', lineHeight: 1.5 }}>
+                    <span style={{ flexShrink: 0, marginTop: 2 }}>✓</span>
+                    <span>{s}</span>
+                  </li>
+                ))
+                : <li style={{ fontSize: 13, color: 'rgba(255,255,255,0.28)', fontStyle: 'italic' }}>No strengths recorded.</li>
+              }
+            </ul>
+          </div>
+
+          {/* Areas for Improvement */}
+          <div style={{
+            borderRadius: 14,
+            border: '1px solid rgba(249,115,22,0.22)',
+            background: 'rgba(249,115,22,0.05)',
+            padding: '20px 22px',
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#fdba74', marginBottom: 14 }}>
+              📈 Areas for Improvement
+            </div>
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {data.areas_for_improvement?.length
+                ? data.areas_for_improvement.map((a, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 8, fontSize: 13, color: 'rgba(253,186,116,0.82)', lineHeight: 1.5 }}>
+                    <span style={{ flexShrink: 0, marginTop: 2 }}>→</span>
+                    <span>{a}</span>
+                  </li>
+                ))
+                : <li style={{ fontSize: 13, color: 'rgba(255,255,255,0.28)', fontStyle: 'italic' }}>No areas recorded.</li>
+              }
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ── Transcript tab ── */}
+      {activeTab === 'transcript' && (
+        <Card>
+          <SectionTitle icon="💬">Full Interview Transcript</SectionTitle>
+          <div style={{ maxHeight: 580, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {data.transcript?.length
+              ? data.transcript.map((msg, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                }}>
+                  <div style={{
+                    maxWidth: '78%', borderRadius: 12,
+                    padding: '11px 15px', fontSize: 13, lineHeight: 1.6,
+                    background: msg.role === 'user'
+                      ? 'rgba(59,130,246,0.18)'
+                      : msg.role === 'assistant'
+                        ? 'rgba(255,255,255,0.06)'
+                        : 'rgba(255,255,255,0.03)',
+                    border: msg.role === 'user'
+                      ? '1px solid rgba(59,130,246,0.35)'
+                      : '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.45, marginBottom: 4 }}>
+                      {msg.role === 'user' ? 'CANDIDATE' : msg.role === 'assistant' ? 'INTERVIEWER' : 'SYSTEM'}
+                      {msg.timestamp && <span style={{ marginLeft: 8 }}>{new Date(msg.timestamp).toLocaleTimeString()}</span>}
+                    </div>
+                    <div style={{ whiteSpace: 'pre-wrap', color: 'rgba(255,255,255,0.82)' }}>{msg.content}</div>
+                  </div>
+                </div>
+              ))
+              : <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.28)', fontSize: 14 }}>
+                Transcript not available
+              </div>
+            }
+          </div>
+        </Card>
+      )}
+
     </div>
   );
 }

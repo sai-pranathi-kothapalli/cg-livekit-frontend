@@ -47,6 +47,22 @@ export function CodeEditor({
 
     const handleEditorDidMount: OnMount = (editor) => {
         editorRef.current = editor;
+
+        // Properly disable Copy, Paste, and Cut within the Monaco instance
+        editor.onKeyDown((e: any) => {
+            const { ctrlKey, metaKey } = e;
+            const isModifier = ctrlKey || metaKey;
+
+            // KeyCodes: C=33, V=52, X=54 (in Monaco's internal representation)
+            // But it's safer to use the standard browser key codes if possible, 
+            // or better yet, Monaco's built-in constants if available.
+            // Standard: C=67, V=86, X=88
+            if (isModifier && (e.browserEvent.keyCode === 67 || e.browserEvent.keyCode === 86 || e.browserEvent.keyCode === 88)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        });
+
         editor.focus();
     };
 

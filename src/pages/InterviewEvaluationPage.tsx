@@ -28,11 +28,12 @@ function getScoreLabel(score: number) {
  * Extract bullet-style issues from the feedback that are relevant to a skill.
  * Falls back to score-based defaults if nothing found.
  */
-function extractIssues(raw: string, skill: 'communication' | 'technical' | 'problem_solving', score: number): string[] {
+function extractIssues(raw: string, skill: 'communication' | 'technical' | 'problem_solving' | 'coding', score: number): string[] {
   const keywords: Record<string, string[]> = {
     communication: ['communication', 'clarity', 'articulate', 'explain', 'express', 'verbal', 'coherent', 'response'],
-    technical: ['technical', 'knowledge', 'concept', 'code', 'algorithm', 'framework', 'system', 'programming'],
+    technical: ['technical', 'knowledge', 'concept', 'framework', 'system', 'programming'],
     problem_solving: ['problem', 'solving', 'approach', 'logic', 'reasoning', 'think', 'solution', 'analysis'],
+    coding: ['code', 'algorithm', 'syntax', 'debugging', 'implementation', 'logic', 'efficiency', 'structure'],
   };
 
   const kws = keywords[skill];
@@ -41,7 +42,7 @@ function extractIssues(raw: string, skill: 'communication' | 'technical' | 'prob
     .split('\n')
     .filter(l => l.trim().match(/^[-*•]/) || l.trim().match(/^\d+\./))
     .map(l => l.replace(/^[-*•\d.]\s*/, '').replace(/\*\*(.*?)\*\*/g, '$1').trim())
-    .filter(l => kws.some(kw => l.toLowerCase().includes(kw)) && l.length > 10 && l.length < 120);
+    .filter(l => kws.some(kw => l.toLowerCase().includes(kw)) && l.length > 5 && l.length < 150);
 
   if (lines.length >= 1) return lines.slice(0, 3);
 
@@ -50,38 +51,43 @@ function extractIssues(raw: string, skill: 'communication' | 'technical' | 'prob
     return {
       communication: ['Clear and structured responses', 'Good use of examples', 'Active engagement'],
       technical: ['Strong conceptual accuracy', 'Demonstrated depth', 'Handled edge cases well'],
-      problem_solving: ['Systematic approach', 'Clear reasoning', 'Considered trade-offs']
+      problem_solving: ['Systematic approach', 'Clear reasoning', 'Considered trade-offs'],
+      coding: ['Clean and readable code structure', 'Efficient algorithm selection', 'Proper error handling']
     }[skill];
   }
   if (score >= 6) {
     return {
       communication: ['Mostly clear with minor gaps', 'Some answers lacked depth', 'Generally good engagement'],
       technical: ['Core concepts understood', 'Minor knowledge gaps', 'Could improve on edge cases'],
-      problem_solving: ['Reasonable approach used', 'Some logical gaps', 'Needs more structured thinking']
+      problem_solving: ['Reasonable approach used', 'Some logical gaps', 'Needs more structured thinking'],
+      coding: ['Functional code with minor errors', 'Sub-optimal logic in places', 'Minimal comments or documentation']
     }[skill];
   }
   if (score >= 4) {
     return {
       communication: ['Unclear explanations in several answers', 'Hesitation noted', 'Needed prompting to elaborate'],
       technical: ['Surface-level knowledge shown', 'Struggled with advanced topics', 'Key concepts were missed'],
-      problem_solving: ['Inconsistent problem approach', 'Skipped intermediate steps', 'Limited reasoning shown']
+      problem_solving: ['Inconsistent problem approach', 'Skipped intermediate steps', 'Limited reasoning shown'],
+      coding: ['Frequent syntax or logic errors', 'Struggled to implement basic requirements', 'Poor code organization']
     }[skill];
   }
   return {
     communication: ['Unable to clearly express ideas', 'Fragmented or off-topic responses', 'No coherent structure observed'],
     technical: ['Unable to answer core technical questions', 'Fundamental gaps detected', 'No domain knowledge shown'],
-    problem_solving: ['No structured problem approach', 'Could not break down problems', 'Avoided analytical questions']
+    problem_solving: ['No structured problem approach', 'Could not break down problems', 'Avoided analytical questions'],
+    coding: ['Could not write functional code', 'Lack of basic programming logic', 'Failed to understand coding tasks']
   }[skill];
 }
 
 /**
  * Try to pull a concrete example sentence from the feedback related to the skill.
  */
-function extractExample(raw: string, skill: 'communication' | 'technical' | 'problem_solving', score: number): string {
+function extractExample(raw: string, skill: 'communication' | 'technical' | 'problem_solving' | 'coding', score: number): string {
   const keywords: Record<string, string[]> = {
     communication: ['explain', 'said', 'responded', 'stated', 'express', 'answer', 'articulate'],
-    technical: ['technical', 'code', 'algorithm', 'concept', 'knowledge', 'implement', 'SQL', 'framework'],
+    technical: ['technical', 'concept', 'knowledge', 'implement', 'SQL', 'framework'],
     problem_solving: ['approach', 'solve', 'solution', 'logic', 'reasoning', 'problem', 'analysis'],
+    coding: ['code', 'algorithm', 'syntax', 'debugging', 'implementation', 'variable', 'function'],
   };
 
   const kws = keywords[skill];
@@ -107,6 +113,11 @@ function extractExample(raw: string, skill: 'communication' | 'technical' | 'pro
       good: 'Candidate broke down the problem systematically and reasoned about edge cases.',
       fair: 'Candidate attempted a solution but skipped key reasoning steps.',
       poor: 'Candidate was unable to structure a meaningful approach to problems.',
+    },
+    coding: {
+      good: 'Candidate wrote clean, efficient code and explained the logic precisely.',
+      fair: 'Candidate completed the task but with some logic errors or poor formatting.',
+      poor: 'Candidate was unable to implement a working solution for the coding task.',
     },
   };
 
@@ -528,7 +539,13 @@ export default function InterviewEvaluationPage() {
       key: 'problem_solving' as const,
       score: data.problem_solving,
     },
-  ].filter(Boolean) as { icon: string; label: string; key: 'communication' | 'technical' | 'problem_solving'; score: number }[];
+    data.coding_score != null && {
+      icon: '⌨️',
+      label: 'Coding Performance',
+      key: 'coding' as const,
+      score: data.coding_score,
+    },
+  ].filter(Boolean) as { icon: string; label: string; key: 'communication' | 'technical' | 'problem_solving' | 'coding'; score: number }[];
 
   return page(
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>

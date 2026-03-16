@@ -366,6 +366,7 @@ export interface StudentAnalyticsResponse {
     communication: number;
     technical: number;
     problem_solving: number;
+    coding: number;
   };
   history: Array<{
     date: string;
@@ -373,6 +374,7 @@ export interface StudentAnalyticsResponse {
     communication: number;
     technical: number;
     problem_solving: number;
+    coding: number;
   }>;
   recent_strengths: string[];
   recent_improvements: string[];
@@ -418,6 +420,7 @@ export interface EvaluationResponse {
   communication_quality?: number;
   technical_knowledge?: number;
   problem_solving?: number;
+  coding_score?: number;
   overall_feedback?: string;
   token_usage?: {
     input_tokens: number;

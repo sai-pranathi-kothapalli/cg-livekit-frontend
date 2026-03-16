@@ -28,5 +28,11 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       sourcemap: true,
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './test/vitest.setup.ts',
+      include: ['test/**/*.{test,spec}.{ts,tsx}'],
+    },
   };
 });

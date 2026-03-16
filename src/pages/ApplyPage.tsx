@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import StudentLayout from '@/components/StudentLayout';
+import { uploadApplication, scheduleInterview } from '@/lib/api';
 
 type FormState = {
   name: string;
@@ -44,10 +45,8 @@ export default function ApplyPage() {
 
   // Validate name - only letters and spaces
   const handleNameChange = (value: string) => {
-    // Allow only letters, spaces, and common name characters (hyphens, apostrophes)
-    const cleaned = value.replace(/[^ a-zA-Z'\-]/g, '');
-    setForm(f => ({ ...f, name: cleaned }));
-    if (cleaned && !/^[ a-zA-Z'\-]+$/.test(cleaned)) {
+    setForm(f => ({ ...f, name: value }));
+    if (value && !/^[ a-zA-Z'\-]+$/.test(value)) {
       setValidationErrors(e => ({ ...e, name: 'Name can only contain letters and spaces' }));
     } else {
       setValidationErrors(e => {
@@ -64,7 +63,7 @@ export default function ApplyPage() {
     // Limit to 10 digits
     const limited = digitsOnly.slice(0, 10);
     setForm(f => ({ ...f, phone: limited }));
-    
+
     if (limited && limited.length !== 10) {
       setValidationErrors(e => ({ ...e, phone: 'Phone number must be exactly 10 digits' }));
     } else {
@@ -90,7 +89,7 @@ export default function ApplyPage() {
 
     const selectedDateTime = new Date(datetime);
     const now = new Date();
-    
+
     // Add 5 minute buffer to ensure we're truly in the future
     const buffer = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes from now
 
@@ -109,36 +108,36 @@ export default function ApplyPage() {
   // Convert form fields to datetime string for API
   function getDateTimeString(): string {
     if (!form.date) return '';
-    
-    // Convert 12-hour to 24-hour format
-    let hour24 = parseInt(form.hour, 10);
-    if (form.ampm === 'PM' && hour24 !== 12) {
-      hour24 += 12;
-    } else if (form.ampm === 'AM' && hour24 === 12) {
-      hour24 = 0;
+
+    try {
+      // Convert 12-hour to 24-hour format
+      let hour24 = parseInt(form.hour, 10);
+      if (form.ampm === 'PM' && hour24 !== 12) {
+        hour24 += 12;
+      } else if (form.ampm === 'AM' && hour24 === 12) {
+        hour24 = 0;
+      }
+
+      const hour24Str = String(hour24).padStart(2, '0');
+      const minuteStr = String(form.minute).padStart(2, '0');
+
+      // Create a Date object from local date/time
+      const localDate = new Date(`${form.date}T${hour24Str}:${minuteStr}:00`);
+
+      if (isNaN(localDate.getTime())) return '';
+
+      // Get timezone offset in minutes and convert to ISO offset format (e.g. +05:30)
+      const offsetMinutes = localDate.getTimezoneOffset();
+      const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
+      const offsetMins = Math.abs(offsetMinutes) % 60;
+      const offsetSign = offsetMinutes <= 0 ? '+' : '-';
+      const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMins).padStart(2, '0')}`;
+
+      return `${form.date}T${hour24Str}:${minuteStr}:00${offsetStr}`;
+    } catch (err) {
+      console.error('Error generating datetime string:', err);
+      return '';
     }
-    
-    const hour24Str = String(hour24).padStart(2, '0');
-    const minuteStr = form.minute.padStart(2, '0');
-    
-    // Create a Date object from local date/time (this interprets it in user's local timezone)
-    const localDate = new Date(`${form.date}T${hour24Str}:${minuteStr}`);
-    
-    // Get timezone offset in minutes and convert to hours:minutes format
-    const offsetMinutes = localDate.getTimezoneOffset();
-    const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
-    const offsetMins = Math.abs(offsetMinutes) % 60;
-    const offsetSign = offsetMinutes <= 0 ? '+' : '-';
-    const offsetStr = `${offsetSign}${String(offsetHours).padStart(2, '0')}:${String(offsetMins).padStart(2, '0')}`;
-    
-    // Format as YYYY-MM-DDTHH:mm:ss+HH:mm (with timezone offset)
-    const year = localDate.getFullYear();
-    const month = String(localDate.getMonth() + 1).padStart(2, '0');
-    const day = String(localDate.getDate()).padStart(2, '0');
-    const hours = String(localDate.getHours()).padStart(2, '0');
-    const minutes = String(localDate.getMinutes()).padStart(2, '0');
-    
-    return `${year}-${month}-${day}T${hours}:${minutes}:00${offsetStr}`;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -176,7 +175,7 @@ export default function ApplyPage() {
     const selectedDateTime = new Date(datetime);
     const now = new Date();
     const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
-    
+
     if (selectedDateTime <= fiveMinutesFromNow) {
       setError('Please select a date and time at least 5 minutes from now');
       setStatus('error');
@@ -190,13 +189,10 @@ export default function ApplyPage() {
     }
 
     try {
-      // First, upload application and extract text
-      const { uploadApplication, scheduleInterview } = await import('@/lib/api');
-      
       if (!form.resume) {
         throw new Error('Application file is required');
       }
-      
+
       const uploadData = await uploadApplication(form.resume);
 
       // Then, schedule interview with application data
@@ -229,10 +225,11 @@ export default function ApplyPage() {
             </p>
           </header>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form data-testid="apply-form" onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-sm font-medium">Full name</label>
+              <label htmlFor="full-name" className="text-sm font-medium">Full name</label>
               <input
+                id="full-name"
                 type="text"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                 value={form.name}
@@ -248,8 +245,9 @@ export default function ApplyPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium">Email address</label>
+              <label htmlFor="email-address" className="text-sm font-medium">Email address</label>
               <input
+                id="email-address"
                 type="email"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                 value={form.email}
@@ -259,8 +257,9 @@ export default function ApplyPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium">Phone number</label>
+              <label htmlFor="phone-number" className="text-sm font-medium">Phone number</label>
               <input
+                id="phone-number"
                 type="tel"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                 value={form.phone}
@@ -282,8 +281,9 @@ export default function ApplyPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium">Upload Application</label>
+              <label htmlFor="resume-upload" className="text-sm font-medium">Upload Application</label>
               <input
+                id="resume-upload"
                 type="file"
                 accept=".pdf,.doc,.docx"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500 file:mr-4 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
@@ -337,11 +337,12 @@ export default function ApplyPage() {
 
             <div className="space-y-3">
               <label className="text-sm font-medium">Preferred date &amp; time</label>
-              
+
               {/* Date picker */}
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Date</label>
+                <label htmlFor="pref-date" className="text-xs text-muted-foreground">Date</label>
                 <input
+                  id="pref-date"
                   type="date"
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                   value={form.date}
@@ -358,8 +359,9 @@ export default function ApplyPage() {
               {/* Time dropdowns */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Hour</label>
+                  <label htmlFor="pref-hour" className="text-xs text-muted-foreground">Hour</label>
                   <select
+                    id="pref-hour"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                     value={form.hour}
                     onChange={e => {
@@ -377,8 +379,9 @@ export default function ApplyPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">Minute</label>
+                  <label htmlFor="pref-minute" className="text-xs text-muted-foreground">Minute</label>
                   <select
+                    id="pref-minute"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                     value={form.minute}
                     onChange={e => {
@@ -396,8 +399,9 @@ export default function ApplyPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">AM/PM</label>
+                  <label htmlFor="pref-ampm" className="text-xs text-muted-foreground">AM/PM</label>
                   <select
+                    id="pref-ampm"
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none ring-0 focus-visible:border-blue-500"
                     value={form.ampm}
                     onChange={e => {
@@ -449,7 +453,7 @@ export default function ApplyPage() {
             </div>
           )}
           {status === 'error' && error && (
-            <p className="text-sm text-red-600">Something went wrong: {error}</p>
+            <p data-testid="error-message" className="text-sm text-red-600">Something went wrong: {error}</p>
           )}
         </div>
       </div>

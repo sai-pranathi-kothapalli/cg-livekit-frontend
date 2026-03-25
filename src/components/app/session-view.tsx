@@ -127,6 +127,66 @@ export const SessionView = ({
 
   const [visionWarning, setVisionWarning] = useState<string | null>(null);
 
+  // Session Restoration (Refresh Handling)
+  useEffect(() => {
+    if (!interviewToken) return;
+
+    const restoreSessionState = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_BACKEND_URL || '';
+        const res = await fetch(`${API_BASE_URL}/api/interviews/session-state/${interviewToken}`);
+
+        if (!res.ok) {
+          throw new Error('Failed to fetch session state');
+        }
+
+        const data = await res.json();
+        debug.log('[Frontend] 🔄 Restoring session state:', data);
+
+        // 1. Restore Transcript
+        if (data.transcript && data.transcript.length > 0) {
+          const historicalMessages: ReceivedMessage[] = data.transcript.map((msg: any, idx: number) => ({
+            id: msg.id || `hist-${idx}`,
+            message: msg.content,
+            timestamp: msg.timestamp || Date.now(),
+            from: {
+              identity: msg.role === 'assistant' ? 'agent' : 'candidate',
+              isLocal: msg.role === 'user',
+            },
+          }));
+          setManualTranscriptMessages(prev => [...historicalMessages, ...prev]);
+        }
+
+        // 2. Restore Interview State (Code, Question)
+        if (data.interview_state) {
+          const state = data.interview_state;
+          if (state.current_question) {
+            setCurrentQuestion(state.current_question);
+            setShowCodeEditor(true);
+          }
+
+          if (state.latest_code) {
+            setEditorCode(state.latest_code);
+          } else if (state.code_submissions && state.code_submissions.length > 0) {
+            // Use last submission if no latest_code
+            const lastSubmission = state.code_submissions[state.code_submissions.length - 1];
+            setEditorCode(lastSubmission.code);
+            setIsEditorSubmitted(true);
+          }
+        }
+
+        // 3. Restore Timer
+        if (data.remaining_minutes !== undefined) {
+          setTimeRemaining(data.remaining_minutes * 60);
+        }
+      } catch (err) {
+        debug.error('[Frontend] ❌ Failed to restore session state:', err);
+      }
+    };
+
+    restoreSessionState();
+  }, [interviewToken]);
+
   useEffect(() => {
     if (!session.isConnected || !session.room) return;
 

@@ -9,9 +9,13 @@ import { debug } from '@/lib/debug';
 interface CodeEditorProps {
     language: string;
     initialCode: string;
+    isSubmitted?: boolean;
+    initialOutput?: { text: string; isError: boolean } | null;
     question: string;
     onCodeSubmit: (code: string, output?: string) => void;
     onRunCode: (code: string, language: string) => Promise<{ output: string; error?: string }>;
+    onCodeChange?: (code: string) => void;
+    onOutputChange?: (output: { text: string; isError: boolean } | null) => void;
     room?: Room;
 }
 
@@ -27,18 +31,22 @@ export function CodeEditor({
     language: initialLanguage = 'python',
     initialCode = '',
     question,
+    isSubmitted = false,
+    initialOutput = null,
     onCodeSubmit,
     onRunCode,
+    onCodeChange,
+    onOutputChange,
     room
 }: CodeEditorProps) {
     const [code, setCode] = useState(initialCode);
     const [language, setLanguage] = useState(initialLanguage);
-    const [output, setOutput] = useState<{ text: string; isError: boolean } | null>(null);
+    const [output, setOutput] = useState<{ text: string; isError: boolean } | null>(initialOutput);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [isExecuting, setIsExecuting] = useState(false);
     const [observationCount, setObservationCount] = useState(0);
     const [startTime] = useState(Date.now());
-    const [submitted, setSubmitted] = useState(false);
+    const [submitted, setSubmitted] = useState(isSubmitted);
     const editorRef = useRef<any>(null);
 
     // Debounce and observation state
@@ -103,6 +111,7 @@ export function CodeEditor({
     const handleCodeChange = useCallback((newCode: string | undefined) => {
         const currentCode = newCode || '';
         setCode(currentCode);
+        onCodeChange?.(currentCode);
 
         if (observationTimerRef.current) {
             clearTimeout(observationTimerRef.current);
@@ -113,7 +122,7 @@ export function CodeEditor({
                 sendCodeObservation(currentCode);
             }, 8000); // 8 second debounce
         }
-    }, [sendCodeObservation, submitted, observationCount]);
+    }, [sendCodeObservation, submitted, observationCount, onCodeChange]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -126,15 +135,21 @@ export function CodeEditor({
 
     const handleRun = async () => {
         setIsExecuting(true);
-        setOutput({ text: 'Executing code...', isError: false });
+        const executingOutput = { text: 'Executing code...', isError: false };
+        setOutput(executingOutput);
+        onOutputChange?.(executingOutput);
         try {
             const result = await onRunCode(code, language);
-            setOutput({
+            const newOutput = {
                 text: result.error ? `Error:\n${result.error}` : result.output || 'Code executed successfully (no output).',
                 isError: !!result.error
-            });
+            };
+            setOutput(newOutput);
+            onOutputChange?.(newOutput);
         } catch (err) {
-            setOutput({ text: `Execution failed: ${err instanceof Error ? err.message : String(err)}`, isError: true });
+            const errorOutput = { text: `Execution failed: ${err instanceof Error ? err.message : String(err)}`, isError: true };
+            setOutput(errorOutput);
+            onOutputChange?.(errorOutput);
         } finally {
             setIsExecuting(false);
         }
@@ -258,7 +273,7 @@ export function CodeEditor({
                         padding: { top: 16, bottom: 16 },
                         lineNumbers: 'on',
                         roundedSelection: false,
-                        readOnly: false,
+                        readOnly: submitted,
                         cursorStyle: 'line',
                         renderWhitespace: 'none',
                         contextmenu: false,

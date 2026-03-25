@@ -13,7 +13,12 @@ export default function InterviewPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { isAuthenticated, isStudent, isLoading: authLoading, user } = useAuth();
-  const [checksPassed, setChecksPassed] = useState(false);
+  const [checksPassed, setChecksPassed] = useState(() => {
+    if (typeof window !== 'undefined' && token) {
+      return sessionStorage.getItem(`checksPassed_${token}`) === 'true';
+    }
+    return false;
+  });
 
   useEffect(() => {
     console.log('[Frontend] 🏗️ InterviewPage mounted', { token });
@@ -305,7 +310,10 @@ export default function InterviewPage() {
     return (
       <PreInterviewChecks
         userName={user?.name || "Candidate"}
-        onAllChecksPassed={() => setChecksPassed(true)}
+        onAllChecksPassed={() => {
+          setChecksPassed(true);
+          if (token) sessionStorage.setItem(`checksPassed_${token}`, 'true');
+        }}
       />
     );
   }

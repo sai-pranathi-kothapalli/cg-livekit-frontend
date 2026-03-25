@@ -110,6 +110,9 @@ export const SessionView = ({
   const [showCodeEditor, setShowCodeEditor] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [codeLanguage, setCodeLanguage] = useState('python');
+  const [editorCode, setEditorCode] = useState('');
+  const [isEditorSubmitted, setIsEditorSubmitted] = useState(false);
+  const [editorOutput, setEditorOutput] = useState<{ text: string; isError: boolean } | null>(null);
 
   // Manual transcript messages state (for messages not picked up by useSessionMessages)
   const [manualTranscriptMessages, setManualTranscriptMessages] = useState<ReceivedMessage[]>([]);
@@ -1039,11 +1042,14 @@ export const SessionView = ({
       debug.warn('⚠️ Cannot send code submission: Room not connected or local participant missing');
     }
 
-    // 4. Auto-close compiler after submission
-    setTimeout(() => {
-      setShowCodeEditor(false);
-      debug.log('🔒 Compiler auto-closed after code submission.');
-    }, 500);
+    // 4. Update local state to reflect submission
+    setIsEditorSubmitted(true);
+    setEditorCode(code);
+    if (executionOutput) {
+      setEditorOutput({ text: executionOutput, isError: executionOutput.toLowerCase().includes('error') });
+    }
+
+    debug.log('🔒 Code submitted. Editor remains open in read-only mode.');
   };
 
   useEffect(() => {
@@ -1130,10 +1136,14 @@ export const SessionView = ({
             showCodeEditor={showCodeEditor}
             codeEditorProps={{
               language: codeLanguage,
-              initialCode: codeLanguage === 'python' ? 'def solution():\n    # Write your code here\n    pass' : '// Write your code here',
+              initialCode: editorCode || (codeLanguage === 'python' ? 'def solution():\n    # Write your code here\n    pass' : '// Write your code here'),
               question: currentQuestion,
+              isSubmitted: isEditorSubmitted,
+              initialOutput: editorOutput,
               onCodeSubmit: handleSubmitCode,
               onRunCode: handleRunCode,
+              onCodeChange: setEditorCode,
+              onOutputChange: setEditorOutput,
             }}
           />
         </div>
@@ -1203,19 +1213,33 @@ export const SessionView = ({
             compilerOpen={showCodeEditor}
             onCompilerOpenChange={(open) => {
               setShowCodeEditor(open);
-              // When opening compiler, set current question from last agent message if available
-              if (open && !currentQuestion) {
+              // When opening compiler, check if we should update or reset the question
+              if (open) {
                 const lastAgentMessage = [...allMessages]
                   .reverse()
                   .find(msg => !msg.from?.isLocal && msg.message);
-                if (lastAgentMessage?.message) {
+
+                if (lastAgentMessage?.message && lastAgentMessage.message !== currentQuestion) {
+                  // A new question (or feedback) is arriving. 
+                  // If it looks like a new question (we can use a simple heuristic or just update if it changed)
+                  // For now, if the question changed, we reset the submission state
+                  debug.log('🆕 New question detected in compiler:', lastAgentMessage.message);
                   setCurrentQuestion(lastAgentMessage.message);
-                  // Auto-detect language if possible
+                  setIsEditorSubmitted(false);
+                  setEditorOutput(null);
+
+                  // Auto-detect language
                   const text = lastAgentMessage.message.toLowerCase();
                   if (text.includes('javascript') || text.includes('js')) setCodeLanguage('javascript');
                   else if (text.includes('python')) setCodeLanguage('python');
                   else if (text.includes('java')) setCodeLanguage('java');
                   else if (text.includes('c++') || text.includes('cpp')) setCodeLanguage('cpp');
+
+                  // Initialize editor code
+                  const initial = text.includes('javascript') || text.includes('js')
+                    ? '// Write your code here'
+                    : 'def solution():\n    # Write your code here\n    pass';
+                  setEditorCode(initial);
                 }
               }
             }}

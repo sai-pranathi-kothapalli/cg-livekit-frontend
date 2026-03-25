@@ -42,8 +42,12 @@ interface TileLayoutProps {
     language: string;
     initialCode: string;
     question: string;
+    isSubmitted?: boolean;
+    initialOutput?: { text: string; isError: boolean } | null;
     onCodeSubmit: (code: string, output?: string) => Promise<void>;
     onRunCode: (code: string, language: string) => Promise<{ output: string; error?: string }>;
+    onCodeChange?: (code: string) => void;
+    onOutputChange?: (output: { text: string; isError: boolean } | null) => void;
   };
 }
 
@@ -258,7 +262,10 @@ export function TileLayout({
             {/* Column 2: Editor or Placeholder */}
             {showCodeEditor ? (
               <div className="h-full min-w-0 animate-in fade-in slide-in-from-right-4 duration-700">
-                <CodeEditor {...codeEditorProps!} />
+                <CodeEditor
+                  key={codeEditorProps?.question || 'default-editor'}
+                  {...codeEditorProps!}
+                />
               </div>
             ) : (
               /* Regular Side-by-Side: Candidate in Col 2 — same size as interviewer */

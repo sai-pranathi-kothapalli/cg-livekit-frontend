@@ -77,56 +77,44 @@ export function VideoAvatar({ agentAudioTrack, agentState }: VideoAvatarProps) {
     const finalIsSpeaking = isSpeaking || agentState === 'speaking';
 
     return (
-        <div className="relative h-full w-full overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-800 flex items-center justify-center">
-            {/* Static Avatar - Professional placeholder */}
-            <div className="relative flex flex-col items-center justify-center">
-                {/* Avatar Circle with subtle pulse when speaking */}
+        <div className="relative h-full w-full overflow-hidden bg-black flex items-center justify-center">
+            {/* Talking Video Loop */}
+            <video
+                src="/videos/talking.mp4"
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${finalIsSpeaking ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                    }`}
+                autoPlay
+                loop
+                muted
+                playsInline
+            />
+
+            {/* Idle Video Loop */}
+            <video
+                src="/videos/idle.mp4"
+                className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${!finalIsSpeaking ? 'opacity-100 z-10' : 'opacity-0 z-0'
+                    }`}
+                autoPlay
+                loop
+                muted
+                playsInline
+            />
+
+            {/* Status indicator overlay (Optional, but kept for professional feel) */}
+            <div className="absolute bottom-6 left-6 z-20 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
                 <div
-                    className={`relative w-32 h-32 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-2xl transition-all duration-500 ${finalIsSpeaking ? 'scale-110 shadow-blue-500/50' : 'scale-100'
+                    className={`h-2 w-2 rounded-full transition-all duration-300 ${finalIsSpeaking
+                        ? 'bg-blue-400 animate-pulse shadow-lg shadow-blue-400/50'
+                        : 'bg-emerald-400 shadow-lg shadow-emerald-400/20'
                         }`}
-                >
-                    {/* Animated ring when speaking */}
-                    {finalIsSpeaking && (
-                        <div className="absolute inset-0 rounded-full border-4 border-blue-400/50 animate-ping" />
-                    )}
-
-                    {/* Initial/Icon */}
-                    <svg
-                        className="w-16 h-16 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                        />
-                    </svg>
-                </div>
-
-                {/* Status indicator */}
-                <div className="mt-4 flex items-center gap-2">
-                    <div
-                        className={`h-2 w-2 rounded-full transition-all duration-300 ${finalIsSpeaking
-                                ? 'bg-blue-400 animate-pulse shadow-lg shadow-blue-400/50'
-                                : 'bg-slate-400'
-                            }`}
-                    />
-                    <span className="text-xs font-medium text-slate-300 uppercase tracking-wider">
-                        {finalIsSpeaking ? 'Speaking' : 'Ready'}
-                    </span>
-                </div>
+                />
+                <span className="text-[10px] font-bold text-white/90 uppercase tracking-widest">
+                    {finalIsSpeaking ? 'Agent Speaking' : 'Agent Ready'}
+                </span>
             </div>
 
-            {/* Subtle background pattern */}
-            <div className="absolute inset-0 opacity-10">
-                <div className="absolute inset-0" style={{
-                    backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.1) 1px, transparent 0)',
-                    backgroundSize: '40px 40px'
-                }} />
-            </div>
+            {/* Subtle vignette for premium look */}
+            <div className="absolute inset-0 z-15 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]" />
         </div>
     );
 }

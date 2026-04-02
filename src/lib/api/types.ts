@@ -92,8 +92,13 @@ export interface ChangePasswordRequest {
   new_password: string;
 }
 
-export interface ResetPasswordRequest {
+export interface PasswordResetRequest {
   email: string;
+}
+
+export interface PasswordResetVerify {
+  email: string;
+  otp: string;
   new_password: string;
 }
 
@@ -427,6 +432,7 @@ export interface EvaluationResponse {
     output_tokens: number;
     total_tokens: number;
   };
+  parse_status?: string;
 }
 
 // ==================== Interview Config Types ====================

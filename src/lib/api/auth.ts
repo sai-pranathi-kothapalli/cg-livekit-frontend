@@ -5,7 +5,7 @@
 import { apiRequest, API_BASE_URL, getAuthHeaders, saveAuthToken, saveUserData } from './client';
 import type {
   LoginRequest, LoginResponse,
-  ChangePasswordRequest, ResetPasswordRequest,
+  ChangePasswordRequest, PasswordResetVerify,
   AdminLoginRequest, AdminLoginResponse,
   StudentRegisterRequest, StudentLoginRequest, StudentLoginResponse,
 } from './types';
@@ -32,13 +32,23 @@ export async function changePassword(data: ChangePasswordRequest): Promise<{ suc
   });
 }
 
-export async function resetPassword(data: ResetPasswordRequest): Promise<{ success: boolean; message: string }> {
+export async function requestPasswordReset(email: string): Promise<{ message: string; expires_in_minutes: number }> {
+  return await apiRequest(`${API_BASE_URL}/api/auth/request-password-reset`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(data: PasswordResetVerify): Promise<{ success: boolean; message: string }> {
   return await apiRequest(`${API_BASE_URL}/api/auth/reset-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
 }
+
+
 
 export async function adminLogin(data: AdminLoginRequest): Promise<AdminLoginResponse> {
   const result = await apiRequest<AdminLoginResponse>(`${API_BASE_URL}/api/auth/admin/login`, {

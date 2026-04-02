@@ -28,7 +28,8 @@ export type {
   LoginRequest,
   LoginResponse,
   ChangePasswordRequest,
-  ResetPasswordRequest,
+  PasswordResetRequest,
+  PasswordResetVerify,
   AdminLoginRequest,
   AdminLoginResponse,
   StudentRegisterRequest,
@@ -65,6 +66,7 @@ export type {
 export {
   login,
   changePassword,
+  requestPasswordReset,
   resetPassword,
   adminLogin,
   studentRegister,

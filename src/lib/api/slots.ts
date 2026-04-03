@@ -13,18 +13,18 @@ export async function getSlots(status?: string, includePast: boolean = false): P
   if (status) params.append('status', status);
   if (includePast) params.append('include_past', 'true');
 
-  const url = `${API_BASE_URL}/api/slots/admin/slots${params.toString() ? '?' + params.toString() : ''}`;
+  const url = `${API_BASE_URL}/api/admin/slots${params.toString() ? '?' + params.toString() : ''}`;
   return apiRequest<SlotResponse[]>(url, {
     headers: getAuthHeaders(),
   });
 }
 
 export async function getAvailableSlots(): Promise<SlotResponse[]> {
-  return apiRequest<SlotResponse[]>(`${API_BASE_URL}/api/slots/available`);
+  return apiRequest<SlotResponse[]>(`${API_BASE_URL}/api/available/slots`);
 }
 
 export async function createSlot(data: CreateSlotRequest): Promise<SlotResponse> {
-  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/slots/admin/slots`, {
+  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/admin/slots`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
@@ -40,7 +40,7 @@ export async function updateSlot(slotId: string, data: UpdateSlotRequest): Promi
     updateData.slot_datetime = new Date(data.slot_datetime).toISOString();
   }
 
-  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/slots/admin/slots/${slotId}`, {
+  return apiRequest<SlotResponse>(`${API_BASE_URL}/api/admin/slots/${slotId}`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(updateData),
@@ -48,14 +48,14 @@ export async function updateSlot(slotId: string, data: UpdateSlotRequest): Promi
 }
 
 export async function deleteSlot(slotId: string): Promise<void> {
-  return apiRequest<void>(`${API_BASE_URL}/api/slots/admin/slots/${slotId}`, {
+  return apiRequest<void>(`${API_BASE_URL}/api/admin/slots/${slotId}`, {
     method: 'DELETE',
     headers: getAuthHeaders(),
   });
 }
 
 export async function createDaySlots(data: CreateDaySlotsRequest): Promise<CreateDaySlotsResponse> {
-  return apiRequest<CreateDaySlotsResponse>(`${API_BASE_URL}/api/slots/admin/slots/create-day`, {
+  return apiRequest<CreateDaySlotsResponse>(`${API_BASE_URL}/api/admin/slots/create-day`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify(data),

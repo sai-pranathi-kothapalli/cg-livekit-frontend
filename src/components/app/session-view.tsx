@@ -114,9 +114,6 @@ export const SessionView = ({
   const [isEditorSubmitted, setIsEditorSubmitted] = useState(false);
   const [editorOutput, setEditorOutput] = useState<{ text: string; isError: boolean } | null>(null);
 
-  // Manual transcript messages state (for messages not picked up by useSessionMessages)
-  const [manualTranscriptMessages, setManualTranscriptMessages] = useState<ReceivedMessage[]>([]);
-
   // Monitoring State
   const [warningState, setWarningState] = useState<{
     show: boolean;
@@ -203,110 +200,16 @@ export const SessionView = ({
       clearTimeout(hideTimer);
     };
   }, [session.isConnected, session.room]);
-
-  // Merge regular messages with manually captured transcript messages, removing duplicates
-  // Deduplicate based on message content, timestamp, and origin (within 2 seconds)
-  // Also handles partial vs full message duplicates (removes partial, keeps full)
   const allMessages = React.useMemo(() => {
-    const combined = [...messages, ...manualTranscriptMessages];
-
-    // Group messages by origin and timestamp bucket
-    const messageGroups = new Map<string, ReceivedMessage[]>();
-
-    combined.forEach(msg => {
-      const timestampBucket = Math.floor((msg.timestamp || 0) / 2000);
-      const origin = msg.from?.isLocal ? 'local' : 'remote';
-      const groupKey = `${timestampBucket}-${origin}`;
-
-      if (!messageGroups.has(groupKey)) {
-        messageGroups.set(groupKey, []);
-      }
-      messageGroups.get(groupKey)!.push(msg);
-    });
-
-    // Within each group, remove duplicates and keep longest message (full vs partial)
-    const result: ReceivedMessage[] = [];
-
-    messageGroups.forEach((groupMessages) => {
-      // Sort by length (longest first) to prioritize full messages
-      groupMessages.sort((a, b) => (b.message?.length || 0) - (a.message?.length || 0));
-
-      const seen: string[] = [];
-
-      for (const msg of groupMessages) {
-        const messageContent = msg.message || '';
-
-        // Check if this message is a duplicate or prefix of an already seen message
-        let isDuplicate = false;
-
-        for (const seenContent of seen) {
-          // Exact match
-          if (seenContent === messageContent) {
-            isDuplicate = true;
-            break;
-          }
-
-          // Check if current message is a prefix of seen message (current is shorter)
-          // Since we sorted longest first, seenContent should be longer
-          if (seenContent.startsWith(messageContent)) {
-            // Current is shorter prefix - skip it, keep the longer seen one
-            isDuplicate = true;
-            break;
-          }
-
-          // Check if seen message is a prefix of current (current is longer)
-          if (messageContent.startsWith(seenContent)) {
-            // Seen is shorter prefix - remove it and keep current (longer)
-            const indexToRemove = result.findIndex(m => m.message === seenContent);
-            if (indexToRemove >= 0) {
-              result.splice(indexToRemove, 1);
-            }
-            const seenIndex = seen.indexOf(seenContent);
-            if (seenIndex >= 0) {
-              seen.splice(seenIndex, 1);
-            }
-            // Continue to add current message
-            break;
-          }
-        }
-
-        if (!isDuplicate) {
-          seen.push(messageContent);
-          result.push(msg);
-        }
-      }
-    });
-
-    // Final deduplication by content hash and rough timestamp to handle cross-bucket edge cases
-    const uniqueMessages = new Map<string, ReceivedMessage>();
-
-    result.forEach(msg => {
-      const content = (msg.message || '').trim();
-      const origin = msg.from?.isLocal ? 'local' : 'remote';
-      // Bucket by 3 seconds for final safety
-      const timeBucket = Math.floor((msg.timestamp || 0) / 3000);
-      const key = `${origin}-${timeBucket}-${content}`;
-
-      if (!uniqueMessages.has(key)) {
-        uniqueMessages.set(key, msg);
-      } else {
-        const existing = uniqueMessages.get(key)!;
-        // Keep the one with the more "official" ID (if one looks like my manual transcript ID)
-        if (existing.id.startsWith('transcript-') && !msg.id.startsWith('transcript-')) {
-          uniqueMessages.set(key, msg);
-        }
-      }
-    });
-
-    return Array.from(uniqueMessages.values()).sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-  }, [messages, manualTranscriptMessages]);
+    return [...messages].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+  }, [messages]);
 
   // DEBUG: Log all messages to verify reception
   useEffect(() => {
     debug.log('📨 MESSAGES DEBUG:', {
       totalMessages: allMessages.length,
       regularMessages: messages.length,
-      manualMessages: manualTranscriptMessages.length,
+
     });
 
     // Log FULL message details
@@ -333,7 +236,7 @@ export const SessionView = ({
         });
       });
     }
-  }, [allMessages, messages, manualTranscriptMessages]);
+  }, [allMessages, messages]);
 
   // Transcript is always visible in one-to-one interview
   const chatOpen = true; // Always show transcript
@@ -600,138 +503,6 @@ export const SessionView = ({
         });
       };
 
-      // Listen to data channel messages manually to debug
-      // NOTE: Since useSessionMessages already picks up agentTranscript messages automatically,
-      // we only need to manually add messages that aren't picked up (fallback only)
-      const handleDataReceived = (payload: Uint8Array, participant?: any, kind?: any, topic?: string) => {
-        try {
-          const decoder = new TextDecoder();
-          const text = decoder.decode(payload);
-          const data = JSON.parse(text);
-
-          debug.log('📡 DATA CHANNEL MESSAGE RECEIVED:', {
-            topic,
-            participant: participant?.identity,
-            participantSid: participant?.sid,
-            isLocal: participant?.isLocal,
-            kind,
-            rawText: text,
-            parsedData: data,
-          });
-
-          // Check for interview warning (2 minutes before end)
-          if (data.type === 'interview_warning') {
-            debug.log('⚠️ Interview warning received:', data.message);
-            // Could show a toast notification here
-            return;
-          }
-
-          // Check for time remaining update
-          if (data.type === 'time_remaining') {
-            debug.log('⏰ Time remaining update received:', data.time_remaining_minutes);
-            if (typeof data.time_remaining_minutes === 'number') {
-              setTimeRemaining(data.time_remaining_minutes);
-            }
-            return;
-          }
-
-          // Check for interview completion signal
-          if (data.type === 'interview_completed') {
-            debug.log('✅ Interview completed signal received:', data);
-
-            // Mark interview as completed (this will trigger fullscreen exit)
-            setIsInterviewCompleted(true);
-
-            // Use token from signal or from props
-            const token = data.token || interviewToken;
-
-            if (!token) {
-              debug.warn('⚠️ Interview completed but no token available for redirect');
-              return;
-            }
-
-            // Show completion message
-            if (data.message) {
-              debug.log('📢 Completion message:', data.message);
-              // You could show a toast/notification here if needed
-            }
-
-            // Redirect to evaluation page after a short delay (allow time for final data save)
-            setTimeout(() => {
-              const evaluationUrl = `/evaluation/${token}`;
-              debug.log('🔄 Redirecting to evaluation page:', evaluationUrl);
-              window.location.href = evaluationUrl;
-            }, 3000); // 3 second delay to allow final data to be saved and closing message to finish
-
-            return; // Don't process as transcript message
-          }
-
-          // Check if this is our transcript message (has "message" field)
-          // Agent transcripts: sent by remote (agent). User transcripts: sent by agent on behalf of user, show as local
-          const isAgentTranscript = data.type === 'agentTranscript' && participant && !participant.isLocal;
-          const isUserTranscript = data.type === 'userTranscript'; // Accept from any participant (agent sends it)
-
-          if (data.message && typeof data.message === 'string' && (isAgentTranscript || isUserTranscript)) {
-            debug.log(`✅ ${data.type} MESSAGE DETECTED:`, data.message.substring(0, 50));
-
-            // For userTranscript, display as local (candidate) message; for agentTranscript use sending participant
-            const displayFrom = isUserTranscript && room.localParticipant ? room.localParticipant : participant;
-
-            // Always add transcript messages to ensure they display
-            // We'll deduplicate in the allMessages merge logic
-            setManualTranscriptMessages(prev => {
-              const now = Date.now();
-
-              // Check for duplicates within manual messages only (by content similarity)
-              // Allow updates if new message is longer (partial -> full)
-              const existingIndex = prev.findIndex(m => {
-                const sameParticipant = m.from?.identity === displayFrom?.identity || m.from?.sid === displayFrom?.sid;
-                const recentTimestamp = Math.abs((m.timestamp || 0) - now) < 5000; // Within 5 seconds
-                const sameOrLongerMessage = data.message === m.message ||
-                  data.message.startsWith(m.message) ||
-                  m.message.startsWith(data.message);
-                return sameParticipant && recentTimestamp && sameOrLongerMessage;
-              });
-
-              // Create a ReceivedMessage object - use displayFrom so userTranscript shows as local user
-              const transcriptMessage: ReceivedMessage = {
-                id: `transcript-${now}-${Math.random().toString(36).substring(2, 9)}`,
-                timestamp: now,
-                message: data.message,
-                from: displayFrom,
-                type: data.type || 'chatMessage', // agentTranscript or userTranscript
-              };
-
-              if (existingIndex >= 0) {
-                const existing = prev[existingIndex];
-                // If new message is longer (full replacing partial), update it
-                if (data.message.length > (existing.message?.length || 0)) {
-                  debug.log('🔄 Updating existing transcript message with longer version');
-                  const updated = [...prev];
-                  updated[existingIndex] = transcriptMessage;
-                  return updated;
-                } else {
-                  // New message is same or shorter, skip to avoid duplicates
-                  debug.log('⚠️ Duplicate or shorter transcript message, skipping');
-                  return prev;
-                }
-              }
-
-              // No existing message found, add new one
-              debug.log('✅ Adding new transcript message to manual messages state');
-              return [...prev, transcriptMessage];
-            });
-          }
-        } catch (e) {
-          debug.log('📡 DATA CHANNEL MESSAGE (non-JSON):', {
-            topic,
-            participant: participant?.identity,
-            payload: new TextDecoder().decode(payload).substring(0, 100),
-            error: e,
-          });
-        }
-      };
-
       const handleTrackSubscribed = (track: any, _pub: any, participant: any) => {
         debug.log('🎧 Audio track subscribed:', {
           kind: track.kind,
@@ -745,7 +516,6 @@ export const SessionView = ({
       // Register event handlers
       room.on('participantConnected', handleParticipantConnected);
       room.on('participantDisconnected', handleParticipantDisconnected);
-      room.on('dataReceived', handleDataReceived);
       room.on('trackSubscribed', handleTrackSubscribed);
 
       // Note: In LiveKit, dataReceived is a room-level event, not participant-level
@@ -756,7 +526,6 @@ export const SessionView = ({
       return () => {
         room.off('participantConnected', handleParticipantConnected);
         room.off('participantDisconnected', handleParticipantDisconnected);
-        room.off('dataReceived', handleDataReceived);
         room.off('trackSubscribed', handleTrackSubscribed);
         delete (window as any).getRoomInfo;
       };

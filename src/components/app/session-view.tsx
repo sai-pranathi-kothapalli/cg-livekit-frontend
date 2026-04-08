@@ -151,7 +151,6 @@ export const SessionView = ({
               isLocal: msg.role === 'user',
             },
           }));
-          setManualTranscriptMessages(prev => [...historicalMessages, ...prev]);
         }
 
         // 2. Restore Interview State (Code, Question)
@@ -426,6 +425,51 @@ export const SessionView = ({
   }, [interviewStartTime, interviewDuration, isInterviewCompleted]);
 
 
+  const handleUserTranscript = (
+    payload: Uint8Array,
+    participant?: any,
+    kind?: any,
+    topic?: string
+  ) => {
+    if (topic !== 'user-transcript') return;
+    try {
+      const data = JSON.parse(new TextDecoder().decode(payload));
+
+      // ONLY handle user transcript types — skip everything else
+      if (data.type !== 'userTranscript' && data.type !== 'user_transcript') {
+        return;
+      }
+
+      setStreamingMessages(prev => {
+        const existingIndex = prev.findIndex(m => m.id === data.id);
+        if (existingIndex !== -1) {
+          // Update if new content is longer (final replaces interim)
+          if ((data.message?.length ?? 0) > (prev[existingIndex].message?.length ?? 0)) {
+            const updated = [...prev];
+            updated[existingIndex] = {
+              ...prev[existingIndex],
+              message: data.message,
+              displayedLength: data.message?.length ?? 0,
+            };
+            return updated;
+          }
+          return prev;
+        }
+        // New message — add it
+        return [...prev, {
+          id: data.id,
+          timestamp: data.timestamp,
+          from: data.from,
+          message: data.message,
+          isStreaming: false,
+          displayedLength: data.message?.length ?? 0,
+          messageOrigin: 'local',
+          type: data.type,
+        }];
+      });
+    } catch (e) {}
+  };
+
   // Expose room info via console command
   useEffect(() => {
     const room = session.room;
@@ -517,6 +561,7 @@ export const SessionView = ({
       room.on('participantConnected', handleParticipantConnected);
       room.on('participantDisconnected', handleParticipantDisconnected);
       room.on('trackSubscribed', handleTrackSubscribed);
+      room.on('dataReceived', handleUserTranscript);
 
       // Note: In LiveKit, dataReceived is a room-level event, not participant-level
       // The room.on('dataReceived') should handle all data channel messages
@@ -527,6 +572,7 @@ export const SessionView = ({
         room.off('participantConnected', handleParticipantConnected);
         room.off('participantDisconnected', handleParticipantDisconnected);
         room.off('trackSubscribed', handleTrackSubscribed);
+        room.off('dataReceived', handleUserTranscript);
         delete (window as any).getRoomInfo;
       };
     }
@@ -841,7 +887,6 @@ export const SessionView = ({
       } as any,
       type: 'chatMessage',
     };
-    setManualTranscriptMessages(prev => [...prev, submissionIndicator]);
 
     // 3. Send message to AI agent via LiveKit data channel
     const room = session.room;

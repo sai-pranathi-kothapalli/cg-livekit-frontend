@@ -31,6 +31,11 @@ export function ProtectedRoute({
   }
 
   if (!isAuthenticated) {
+    // [OK] Allow public access to evaluation reports (LMS-integrated)
+    const isEvaluationPage = window.location.pathname.startsWith('/evaluation/');
+    if (isEvaluationPage) {
+      return <>{children}</>;
+    }
     return <Navigate to="/login" replace />;
   }
 

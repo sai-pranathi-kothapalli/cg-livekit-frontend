@@ -140,18 +140,7 @@ export const SessionView = ({
         const data = await res.json();
         debug.log('[Frontend] 🔄 Restoring session state:', data);
 
-        // 1. Restore Transcript
-        if (data.transcript && data.transcript.length > 0) {
-          const historicalMessages: ReceivedMessage[] = data.transcript.map((msg: any, idx: number) => ({
-            id: msg.id || `hist-${idx}`,
-            message: msg.content,
-            timestamp: msg.timestamp || Date.now(),
-            from: {
-              identity: msg.role === 'assistant' ? 'agent' : 'candidate',
-              isLocal: msg.role === 'user',
-            },
-          }));
-        }
+        // 1. Restore Transcript (historical messages are not re-injected; session resumes fresh)
 
         // 2. Restore Interview State (Code, Question)
         if (data.interview_state) {
@@ -427,8 +416,8 @@ export const SessionView = ({
 
   const handleUserTranscript = (
     payload: Uint8Array,
-    participant?: any,
-    kind?: any,
+    _participant?: any,
+    _kind?: any,
     topic?: string
   ) => {
     if (topic !== 'user-transcript') return;
@@ -875,20 +864,7 @@ export const SessionView = ({
     // 1. Analyze with Gemini for immediate conversational context
     const analysisResponse = await analyzeCode(currentQuestion, code, codeLanguage);
 
-    // 2. Add a subtle "Code submitted" indicator to transcript instead of raw analysis
-    const submissionIndicator: ReceivedMessage = {
-      id: `submission-${Date.now()}`,
-      timestamp: Date.now(),
-      message: `✅ **Code submitted for review**`,
-      from: {
-        identity: 'System',
-        name: 'System',
-        isLocal: true,
-      } as any,
-      type: 'chatMessage',
-    };
-
-    // 3. Send message to AI agent via LiveKit data channel
+    // 2. Send message to AI agent via LiveKit data channel
     const room = session.room;
     if (room && room.localParticipant) {
       const analysisMessage = {

@@ -229,11 +229,10 @@ export function PreInterviewChecks({ onAllChecksPassed, userName = "Candidate" }
     }, []);
 
     const allPassed =
-        micStatus === 'success' &&
         screenShareStatus === 'success' &&
         (speedStatus === 'success' || speedStatus === 'warning') &&
         audioOutputStatus === 'success';
-        // Camera check removed - users can continue without camera
+        // Camera and Mic checks made optional - users can continue without them
 
     return (
         <div className="min-h-screen bg-slate-950 flex flex-col text-slate-100 font-sans">

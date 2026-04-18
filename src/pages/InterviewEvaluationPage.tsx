@@ -3,16 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { getEvaluation, type EvaluationResponse, API_BASE_URL } from '@/lib/api';
 import { 
-  User, 
   ClipboardList, 
-  Zap, 
   AlertTriangle, 
   FileText, 
-  CheckCircle2, 
   Terminal, 
   Activity, 
-  ShieldAlert,
-  BarChart3,
   Search,
   MessageSquare,
   Brain,
@@ -22,7 +17,6 @@ import {
   Flag,
   Sparkles,
   Lightbulb,
-  FileSearch,
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
@@ -193,47 +187,6 @@ function parseSections(raw: string) {
 
 // ─── Markdown Table Renderer ──────────────────────────────────────────────────
 
-function MarkdownTable({ raw }: { raw: string }) {
-  const rows = raw.split('\n').filter(l => l.includes('|'));
-  if (rows.length < 2) return <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{raw}</div>;
-
-  const parseRow = (row: string) => row.split('|').filter((_, i, arr) => i > 0 && i < arr.length - 1).map(c => c.trim());
-  const headers = parseRow(rows[0]);
-  const dataRows = rows.slice(2).map(parseRow);
-
-  return (
-    <div style={{ 
-      overflowX: 'auto', 
-      margin: '10px 0', 
-      borderRadius: 10, 
-      border: '1px solid rgba(255,255,255,0.1)',
-      background: 'rgba(255,255,255,0.02)'
-    }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-        <thead>
-          <tr style={{ background: 'rgba(99, 102, 241, 0.1)' }}>
-            {headers.map((h, i) => (
-              <th key={i} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#818cf8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dataRows.map((row, i) => (
-            <tr key={i} style={{ borderBottom: i === dataRows.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
-              {row.map((cell, j) => (
-                <td key={j} style={{ padding: '10px 16px', color: 'rgba(255,255,255,0.7)' }}>
-                  {cell.includes('**') ? <strong>{cell.replace(/\*\*/g, '')}</strong> : cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
@@ -269,14 +222,13 @@ function BarChart({ score }: { score: number }) {
 // ─── Skill card ───────────────────────────────────────────────────────────────
 
 interface SkillCardProps {
-  icon: string;
   label: string;
   score: number;
   issues: string[];
   example: string;
 }
 
-function SkillCard({ icon, label, score, issues, example }: SkillCardProps) {
+function SkillCard({ label, score, issues, example }: SkillCardProps) {
   const color = getScoreColor(score);
   const scoreLabel = getScoreLabel(score);
 
@@ -670,30 +622,26 @@ export default function InterviewEvaluationPage() {
   // Build skill cards data
   const skillCards = [
     data.communication_quality != null && {
-      icon: '🗣',
       label: 'Communication Quality',
       key: 'communication' as const,
       score: data.communication_quality,
     },
     data.technical_knowledge != null && {
-      icon: '💻',
       label: 'Technical Knowledge',
       key: 'technical' as const,
       score: data.technical_knowledge,
     },
     data.problem_solving != null && {
-      icon: '🧠',
       label: 'Problem Solving',
       key: 'problem_solving' as const,
       score: data.problem_solving,
     },
     data.coding_score != null && {
-      icon: '⌨️',
       label: 'Coding Performance',
       key: 'coding' as const,
       score: data.coding_score,
     },
-  ].filter(Boolean) as { icon: string; label: string; key: 'communication' | 'technical' | 'problem_solving' | 'coding'; score: number }[];
+  ].filter(Boolean) as { label: string; key: 'communication' | 'technical' | 'problem_solving' | 'coding'; score: number }[];
 
   return page(
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -800,7 +748,6 @@ export default function InterviewEvaluationPage() {
             {skillCards.map(card => (
               <SkillCard
                 key={card.key}
-                icon={card.icon}
                 label={card.label}
                 score={card.score}
                 issues={extractIssues(feedback, card.key, card.score)}

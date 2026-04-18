@@ -1,17 +1,41 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { getEvaluation, type EvaluationResponse } from '@/lib/api';
+import { getEvaluation, type EvaluationResponse, API_BASE_URL } from '@/lib/api';
+import { 
+  User, 
+  ClipboardList, 
+  Zap, 
+  AlertTriangle, 
+  FileText, 
+  CheckCircle2, 
+  Terminal, 
+  Activity, 
+  ShieldAlert,
+  BarChart3,
+  Search,
+  MessageSquare,
+  Brain,
+  Handshake,
+  ShieldCheck,
+  Keyboard,
+  Flag,
+  Sparkles,
+  Lightbulb,
+  FileSearch,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
 type EvaluationData = EvaluationResponse;
 
 // ─── colour helpers ────────────────────────────────────────────────────────────
 
 function getScoreColor(score: number) {
-  if (score >= 8) return '#22c55e';
-  if (score >= 6) return '#3b82f6';
-  if (score >= 4) return '#eab308';
-  return '#ef4444';
+  if (score >= 8) return '#60a5fa'; // Indigo Blue
+  if (score >= 6) return '#94a3b8'; // Slate
+  if (score >= 4) return '#facc15'; // Amber (Muted)
+  return '#f87171'; // Red (Muted)
 }
 
 function getScoreLabel(score: number) {
@@ -127,39 +151,88 @@ function extractExample(raw: string, skill: 'communication' | 'technical' | 'pro
 
 // ─── feedback section parser ──────────────────────────────────────────────────
 
-const SKIP_SECTION = /hire recommendation|can the candidate be hired|scorecard/i;
+const SKIP_SECTION = /hire recommendation|can the candidate be hired/i;
 
 function parseSections(raw: string) {
-  const parts = raw.split(/\n(?=#{1,4}\s)/);
-  const out: { title: string; body: string }[] = [];
+  // First, normalize the text by replacing literal \n if they somehow still exist
+  const normalized = raw.replace(/\\n/g, '\n');
+  
+  // Split by headers (### Section Name)
+  const parts = normalized.split(/\n(?=#{1,4}\s)/);
+  const out: { title: string; body: string; isTable?: boolean }[] = [];
 
   for (const part of parts) {
     const hm = part.match(/^#{1,4}\s+(.+)/);
     if (hm) {
       const title = hm[1].trim();
       if (SKIP_SECTION.test(title)) continue;
-      const body = part
-        .replace(/^#{1,4}\s+.+\n?/, '')
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .split('\n')
-        .filter(l => !l.trim().startsWith('|'))
-        .join('\n')
-        .trim();
-      if (body) out.push({ title, body });
+      
+      const body = part.replace(/^#{1,4}\s+.+\n?/, '').trim();
+      if (body) {
+        // Detect if body is primarily a table
+        const isTable = body.includes('|') && body.includes('---');
+        out.push({ title, body, isTable });
+      }
     } else {
-      const body = part
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/\*(.*?)\*/g, '$1')
-        .split('\n')
-        .filter(l => !l.trim().startsWith('|'))
-        .join('\n')
-        .trim();
-      if (body) out.push({ title: 'Summary', body });
+      const body = part.trim();
+      if (body) {
+        if (body.includes('|') && body.includes('---')) {
+          out.push({ title: 'Scorecard', body, isTable: true });
+        } else {
+          out.push({ title: 'Summary', body });
+        }
+      }
     }
   }
-  if (!out.length && raw.trim()) out.push({ title: 'Feedback', body: raw.trim() });
+  
+  if (!out.length && normalized.trim()) {
+    out.push({ title: 'Feedback', body: normalized.trim() });
+  }
   return out;
+}
+
+// ─── Markdown Table Renderer ──────────────────────────────────────────────────
+
+function MarkdownTable({ raw }: { raw: string }) {
+  const rows = raw.split('\n').filter(l => l.includes('|'));
+  if (rows.length < 2) return <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)' }}>{raw}</div>;
+
+  const parseRow = (row: string) => row.split('|').filter((_, i, arr) => i > 0 && i < arr.length - 1).map(c => c.trim());
+  const headers = parseRow(rows[0]);
+  const dataRows = rows.slice(2).map(parseRow);
+
+  return (
+    <div style={{ 
+      overflowX: 'auto', 
+      margin: '10px 0', 
+      borderRadius: 10, 
+      border: '1px solid rgba(255,255,255,0.1)',
+      background: 'rgba(255,255,255,0.02)'
+    }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: 'rgba(99, 102, 241, 0.1)' }}>
+            {headers.map((h, i) => (
+              <th key={i} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, color: '#818cf8', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {dataRows.map((row, i) => (
+            <tr key={i} style={{ borderBottom: i === dataRows.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.05)' }}>
+              {row.map((cell, j) => (
+                <td key={j} style={{ padding: '10px 16px', color: 'rgba(255,255,255,0.7)' }}>
+                  {cell.includes('**') ? <strong>{cell.replace(/\*\*/g, '')}</strong> : cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 // ─── Bar chart ────────────────────────────────────────────────────────────────
@@ -209,28 +282,42 @@ function SkillCard({ icon, label, score, issues, example }: SkillCardProps) {
 
   return (
     <div style={{
-      borderRadius: 14,
-      border: `1px solid ${color}30`,
-      background: `${color}08`,
-      padding: '20px 22px',
+      borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.06)',
+      background: 'rgba(30, 41, 59, 0.4)',
+      backdropFilter: 'blur(10px)',
+      padding: '24px',
       display: 'flex',
       flexDirection: 'column',
-      gap: 14,
+      gap: 16,
+      boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
     }}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20 }}>{icon}</span>
-          <span style={{ fontWeight: 700, fontSize: 15, color: 'rgba(255,255,255,0.88)' }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ 
+            width: 38, height: 38, borderRadius: 10, 
+            background: 'rgba(99, 102, 241, 0.15)', 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)'
+          }}>
+            {label.toLowerCase().includes('communication') ? <MessageSquare size={20} /> :
+             label.toLowerCase().includes('technical') ? <Terminal size={20} /> :
+             label.toLowerCase().includes('problem') ? <Brain size={20} /> :
+             label.toLowerCase().includes('coding') ? <Keyboard size={20} /> : 
+             <Activity size={20} />}
+          </div>
+          <span style={{ fontWeight: 600, fontSize: 16, color: '#f1f5f9', letterSpacing: '-0.2px' }}>{label}</span>
         </div>
         <span style={{
           fontSize: 11,
           fontWeight: 700,
-          color,
-          background: `${color}18`,
-          border: `1px solid ${color}40`,
-          borderRadius: 20,
-          padding: '3px 10px',
+          color: '#f1f5f9',
+          background: color,
+          borderRadius: 6,
+          padding: '2px 8px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
         }}>
           {scoreLabel}
         </span>
@@ -241,13 +328,13 @@ function SkillCard({ icon, label, score, issues, example }: SkillCardProps) {
 
       {/* Issues */}
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(255,255,255,0.35)', marginBottom: 8 }}>
-          Issues Detected
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148, 163, 184, 0.5)', marginBottom: 10 }}>
+          Assessment Detail
         </div>
-        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
           {issues.map((issue, i) => (
-            <li key={i} style={{ display: 'flex', gap: 7, fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
-              <span style={{ color, flexShrink: 0, marginTop: 1 }}>•</span>
+            <li key={i} style={{ display: 'flex', gap: 8, fontSize: 13, color: '#94a3b8', lineHeight: 1.6 }}>
+              <span style={{ color: '#6366f1', flexShrink: 0, marginTop: 1 }}>•</span>
               <span>{issue}</span>
             </li>
           ))}
@@ -256,16 +343,15 @@ function SkillCard({ icon, label, score, issues, example }: SkillCardProps) {
 
       {/* Example */}
       <div style={{
-        background: 'rgba(255,255,255,0.04)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderLeft: `3px solid ${color}`,
-        borderRadius: '0 8px 8px 0',
-        padding: '10px 14px',
+        background: 'rgba(15, 23, 42, 0.3)',
+        border: '1px solid rgba(255,255,255,0.04)',
+        borderRadius: 12,
+        padding: '12px 16px',
       }}>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'rgba(255,255,255,0.3)', marginBottom: 5 }}>
-          Example from interview
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(148, 163, 184, 0.4)', marginBottom: 6 }}>
+          Evidence Artifact
         </div>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', lineHeight: 1.55 }}>
+        <div style={{ fontSize: 13, color: '#64748b', fontStyle: 'italic', lineHeight: 1.6 }}>
           {example}
         </div>
       </div>
@@ -280,10 +366,11 @@ function OverallScoreBadge({ score }: { score: number }) {
   const label = getScoreLabel(score);
   return (
     <div style={{
-      borderRadius: 14,
-      border: `1px solid ${color}40`,
-      background: `${color}10`,
-      padding: '24px 28px',
+      borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.06)',
+      background: 'rgba(30, 41, 59, 0.4)',
+      backdropFilter: 'blur(10px)',
+      padding: '32px',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -325,34 +412,73 @@ function OverallScoreBadge({ score }: { score: number }) {
   );
 }
 
+function ConfidenceScoreBadge({ score }: { score: number }) {
+  const color = '#6366f1'; // Indigo for confidence
+  return (
+    <div style={{
+      borderRadius: 16,
+      border: '1px solid rgba(255,255,255,0.06)',
+      background: 'rgba(30, 41, 59, 0.4)',
+      backdropFilter: 'blur(10px)',
+      padding: '24px 32px',
+      display: 'flex',
+      flex: 1,
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    }}>
+      <div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Candidate Confidence
+        </div>
+        <div style={{ fontSize: 42, fontWeight: 800, color, lineHeight: 1 }}>
+          {(score * 10).toFixed(0)}
+          <span style={{ fontSize: 20, fontWeight: 500, color: 'rgba(255,255,255,0.3)' }}> %</span>
+        </div>
+      </div>
+      <div style={{
+        width: 60, height: 60,
+        borderRadius: '50%',
+        border: `2px solid ${color}30`,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 24,
+        opacity: 0.6,
+      }}>
+        ⚡
+      </div>
+    </div>
+  );
+}
+
 // ─── Condensed feedback block ─────────────────────────────────────────────────
 
-const ICON_MAP: Record<string, string> = {
-  'Summary': '📝',
-  'Candidate Summary': '📝',
-  'Integrity Analysis': '🔍',
-  'Technical Knowledge': '💻',
-  'Communication': '🗣',
-  'Communication Skills': '🗣',
-  'Problem Solving': '🧠',
-  'Problem Solving Behavior': '🧠',
-  'Behavioral': '🤝',
-  'Behavioral & Soft Skills': '🤝',
-  'Proctoring': '🛡',
-  'Proctoring Violation': '🛡',
-  'Coding': '⌨️',
-  'Coding Question': '⌨️',
-  'Red Flags': '🚩',
-  'Strengths': '✨',
-  'Areas of Concern': '⚠️',
-  'Reasoning': '💡',
+const ICON_MAP: Record<string, any> = {
+  'Summary': FileText,
+  'Candidate Summary': FileText,
+  'Integrity Analysis': Search,
+  'Technical Knowledge': Terminal,
+  'Communication': MessageSquare,
+  'Communication Skills': MessageSquare,
+  'Problem Solving': Brain,
+  'Problem Solving Behavior': Brain,
+  'Behavioral': Handshake,
+  'Behavioral & Soft Skills': Handshake,
+  'Proctoring': ShieldCheck,
+  'Proctoring Violation': ShieldCheck,
+  'Coding': Keyboard,
+  'Coding Question': Keyboard,
+  'Red Flags': Flag,
+  'Strengths': Sparkles,
+  'Areas of Concern': AlertTriangle,
+  'Reasoning': Lightbulb,
 };
 
 function getIcon(title: string) {
   for (const key of Object.keys(ICON_MAP)) {
     if (title.toLowerCase().includes(key.toLowerCase())) return ICON_MAP[key];
   }
-  return '📋';
+  return ClipboardList;
 }
 
 function CondensedFeedback({ raw }: { raw: string }) {
@@ -364,44 +490,63 @@ function CondensedFeedback({ raw }: { raw: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {sections.map((s, i) => {
-        const icon = getIcon(s.title);
+        const IconComponent = getIcon(s.title);
         const isOpen = !!expanded[i];
         const preview = s.body.split('\n').filter(Boolean)[0] || '';
         const lines = s.body.split('\n').filter(Boolean);
 
         return (
           <div key={i} style={{
-            borderRadius: 10,
-            border: '1px solid rgba(255,255,255,0.08)',
-            background: 'rgba(255,255,255,0.03)',
-            overflow: 'hidden',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.06)',
+            background: isOpen ? 'rgba(255,255,255,0.04)' : 'transparent',
+            transition: 'all 0.3s ease',
+            marginBottom: 8,
           }}>
             <button
               onClick={() => toggle(i)}
               style={{
                 width: '100%',
-                padding: '13px 16px',
+                padding: '14px 18px',
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 10,
+                gap: 12,
                 textAlign: 'left',
               }}
             >
-              <span style={{ fontSize: 16 }}>{icon}</span>
-              <span style={{ flex: 1, fontWeight: 600, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
+              <div style={{ 
+                color: isOpen ? '#818cf8' : 'rgba(255,255,255,0.4)',
+                transition: 'color 0.2s'
+              }}>
+                <IconComponent size={18} />
+              </div>
+              <span style={{ 
+                flex: 1, 
+                fontWeight: 600, 
+                fontSize: 14, 
+                color: isOpen ? '#f1f5f9' : 'rgba(255,255,255,0.7)' 
+              }}>
                 {s.title}
               </span>
               {!isOpen && (
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ 
+                  fontSize: 12, 
+                  color: 'rgba(255,255,255,0.25)', 
+                  maxWidth: 320, 
+                  overflow: 'hidden', 
+                  textOverflow: 'ellipsis', 
+                  whiteSpace: 'nowrap',
+                  fontWeight: 400
+                }}>
                   {preview}
                 </span>
               )}
-              <span style={{ fontSize: 14, color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
-                {isOpen ? '▲' : '▼'}
-              </span>
+              <div style={{ color: 'rgba(255,255,255,0.2)' }}>
+                {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </div>
             </button>
 
             {isOpen && (
@@ -437,10 +582,13 @@ function CondensedFeedback({ raw }: { raw: string }) {
 function Card({ children, style }: { children: ReactNode; style?: React.CSSProperties }) {
   return (
     <div style={{
-      background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 14,
-      padding: '22px 26px',
+      background: 'rgba(30, 41, 59, 0.4)',
+      backdropFilter: 'blur(12px)',
+      WebkitBackdropFilter: 'blur(12px)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      borderRadius: 16,
+      padding: '28px',
+      boxShadow: '0 4px 24px -1px rgba(0, 0, 0, 0.2)',
       ...style,
     }}>
       {children}
@@ -560,18 +708,34 @@ export default function InterviewEvaluationPage() {
             Detailed assessment of candidate performance
           </p>
         </div>
-        <button
-          onClick={() => navigate(backTo)}
-          style={{
-            padding: '8px 18px', borderRadius: 8,
-            border: '1px solid rgba(255,255,255,0.13)',
-            background: 'rgba(255,255,255,0.05)',
-            color: 'rgba(255,255,255,0.75)',
-            cursor: 'pointer', fontSize: 14, fontWeight: 500,
-          }}
-        >
-          ← Back
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={() => window.open(`${API_BASE_URL}/api/interviews/evaluation/${token}/export/pdf`, '_blank')}
+            style={{
+              padding: '8px 18px', borderRadius: 8,
+              border: '1px solid #3b82f640',
+              background: '#3b82f615',
+              color: '#60a5fa',
+              cursor: 'pointer', fontSize: 14, fontWeight: 600,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <span>📄</span>
+            Download PDF
+          </button>
+          <button
+            onClick={() => navigate(backTo)}
+            style={{
+              padding: '8px 18px', borderRadius: 8,
+              border: '1px solid rgba(255,255,255,0.13)',
+              background: 'rgba(255,255,255,0.05)',
+              color: 'rgba(255,255,255,0.75)',
+              cursor: 'pointer', fontSize: 14, fontWeight: 500,
+            }}
+          >
+            ← Back
+          </button>
+        </div>
       </div>
 
       {/* Interview info strip */}
@@ -614,10 +778,17 @@ export default function InterviewEvaluationPage() {
         </Card>
       )}
 
-      {/* Overall score */}
-      {data.overall_score != null && (
-        <OverallScoreBadge score={data.overall_score} />
-      )}
+      {/* Overall score & Confidence */}
+      <div style={{ display: 'flex', gap: 20, width: '100%' }}>
+        {data.overall_score != null && (
+          <div style={{ flex: 1.5 }}>
+            <OverallScoreBadge score={data.overall_score} />
+          </div>
+        )}
+        {data.confidence_level != null && (
+          <ConfidenceScoreBadge score={data.confidence_level} />
+        )}
+      </div>
 
       {/* ── Skill cards with bar charts, issues & examples ── */}
       {skillCards.length > 0 && (

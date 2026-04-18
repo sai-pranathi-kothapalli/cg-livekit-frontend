@@ -11,6 +11,7 @@
 
 // Core client utilities
 export {
+  API_BASE_URL,
   saveAuthToken,
   removeAuthToken,
   getUserRole,

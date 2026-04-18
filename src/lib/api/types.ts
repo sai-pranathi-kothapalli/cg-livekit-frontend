@@ -426,6 +426,7 @@ export interface EvaluationResponse {
   technical_knowledge?: number;
   problem_solving?: number;
   coding_score?: number;
+  confidence_level?: number;
   overall_feedback?: string;
   token_usage?: {
     input_tokens: number;
